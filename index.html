@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>RobotLearn — RAPID + ABB IRB 4600</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
   <header class="topbar">
@@ -68,7 +68,7 @@
           <h3>I/O</h3>
           <label><input type="checkbox" id="diPieza"> DI diPieza</label>
           <label><input type="checkbox" id="diPermiso"> DI diPermiso</label>
-          <div class="output"><span>DO doPinza</span><b id="doPinza">0</b></div>
+          <div class="output"><span>DO doVentosa</span><b id="doVentosa">0</b></div>
           <div class="output"><span>DO doOK</span><b id="doOK">0</b></div>
         </div>
         <div class="console-card">
@@ -76,7 +76,7 @@
           <pre id="console"></pre>
         </div>
       </div>
-      <div class="support-note">Soporte inicial: <code>MoveJ</code>, <code>MoveL</code>, <code>MoveAbsJ</code>, <code>WaitTime</code>, <code>WaitDI</code>, <code>SetDO</code> y <code>TPWrite</code>. El parser crecerá con el curso.</div>
+      <div class="support-note">Soporte actual: <code>MoveJ</code>, <code>MoveL</code>, <code>MoveAbsJ</code>, <code>Offs()</code>, <code>WaitTime</code>, <code>WaitDI</code>, <code>SetDO</code> y <code>TPWrite</code>. Las poses inválidas se rechazan sin romper el estado del robot.</div>
     </section>
   </main>
 
@@ -87,11 +87,11 @@
   <!-- Three.js mejora el render si la red lo permite. RobotLearn NO depende de él: robot-lite.js funciona offline. -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="src/config.js"></script>
-  <script src="src/robot-lite.js"></script>
-  <script src="src/robot.js"></script>
-  <script src="src/rapid.js"></script>
-  <script src="src/course.js"></script>
-  <script src="src/app.js"></script>
+  <script src="src/config.js?v=3"></script>
+  <script src="src/robot-lite.js?v=3"></script>
+  <script src="src/robot.js?v=3"></script>
+  <script src="src/rapid.js?v=3"></script>
+  <script src="src/course.js?v=3"></script>
+  <script src="src/app.js?v=3"></script>
 </body>
 </html>
