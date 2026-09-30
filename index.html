@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RobotLearn — RAPID + ABB IRB 4600</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">RL</span><div><strong>RobotLearn</strong><small>RAPID + ABB IRB 4600</small></div></div>
+    <div class="top-controls">
+      <label>Robot
+        <select id="variantSelect">
+          <option value="60_205">IRB 4600-60/2.05</option>
+          <option value="45_205">IRB 4600-45/2.05</option>
+          <option value="40_255">IRB 4600-40/2.55</option>
+          <option value="20_250">IRB 4600-20/2.50</option>
+        </select>
+      </label>
+      <span class="pill">IRC5 / M2004</span>
+      <span class="pill warning">Simulador educativo</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="course-panel panel">
+      <div class="panel-title"><span>Curso</span><span id="progressText">0 / 8</span></div>
+      <div id="lessonList" class="lesson-list"></div>
+      <article id="lessonContent" class="lesson-content"></article>
+    </aside>
+
+    <section class="sim-panel panel">
+      <div class="panel-title">
+        <span>Simulador 3D</span>
+        <div class="sim-buttons">
+          <button id="homeBtn" class="ghost">Home</button>
+          <button id="resetCamBtn" class="ghost">Cámara</button>
+        </div>
+      </div>
+      <div id="viewport" class="viewport">
+        <div id="threeError" class="three-error hidden">No se pudo cargar el motor 3D. Revisá si esta red bloquea jsDelivr.</div>
+      </div>
+      <div class="telemetry">
+        <div><span>TCP X</span><strong id="tcpX">0</strong><small>mm</small></div>
+        <div><span>TCP Y</span><strong id="tcpY">0</strong><small>mm</small></div>
+        <div><span>TCP Z</span><strong id="tcpZ">0</strong><small>mm</small></div>
+        <div><span>Estado</span><strong id="robotState">Listo</strong></div>
+      </div>
+      <div id="jointControls" class="joint-controls"></div>
+    </section>
+
+    <section class="code-panel panel">
+      <div class="panel-title">
+        <span>RAPID Playground</span>
+        <select id="exampleSelect" aria-label="Ejemplos"></select>
+      </div>
+      <textarea id="editor" spellcheck="false" aria-label="Editor RAPID"></textarea>
+      <div class="runbar">
+        <button id="runBtn" class="primary">▶ Ejecutar</button>
+        <button id="stepBtn">Paso</button>
+        <button id="stopBtn">■ Stop</button>
+        <label class="speed">Velocidad <input id="speedRange" type="range" min="0.2" max="2" value="1" step="0.1"><span id="speedValue">1.0×</span></label>
+      </div>
+
+      <div class="lower-grid">
+        <div class="io-card">
+          <h3>I/O</h3>
+          <label><input type="checkbox" id="diPieza"> DI diPieza</label>
+          <label><input type="checkbox" id="diPermiso"> DI diPermiso</label>
+          <div class="output"><span>DO doPinza</span><b id="doPinza">0</b></div>
+          <div class="output"><span>DO doOK</span><b id="doOK">0</b></div>
+        </div>
+        <div class="console-card">
+          <div class="console-head"><h3>Consola</h3><button id="clearConsole" class="text-btn">limpiar</button></div>
+          <pre id="console"></pre>
+        </div>
+      </div>
+      <div class="support-note">Soporte inicial: <code>MoveJ</code>, <code>MoveL</code>, <code>MoveAbsJ</code>, <code>WaitTime</code>, <code>WaitDI</code>, <code>SetDO</code> y <code>TPWrite</code>. El parser crecerá con el curso.</div>
+    </section>
+  </main>
+
+  <footer>
+    RobotLearn no es RobotStudio ni un Virtual Controller de ABB. Está pensado para aprendizaje, visualización y práctica segura de conceptos RAPID.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="src/config.js"></script>
+  <script src="src/robot.js"></script>
+  <script src="src/rapid.js"></script>
+  <script src="src/course.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>
