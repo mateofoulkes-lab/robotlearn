@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>RobotLearn — RAPID + ABB IRB 4600</title>
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <header class="topbar">
@@ -51,22 +51,67 @@
           <button id="resetCamBtn" class="ghost">Cámara</button>
         </div>
       </div>
+
       <div id="viewport" class="viewport">
         <div id="threeError" class="three-error hidden"></div>
       </div>
+
       <div class="telemetry">
         <div><span>TCP X</span><strong id="tcpX">0</strong><small>mm</small></div>
         <div><span>TCP Y</span><strong id="tcpY">0</strong><small>mm</small></div>
         <div><span>TCP Z</span><strong id="tcpZ">0</strong><small>mm</small></div>
         <div><span>Estado</span><strong id="robotState">Listo</strong></div>
       </div>
-      <div class="sensor-strip">
-        <div class="sensor"><span>diSobreLateral</span><strong id="sSobreLateral">0</strong><small>ventosa sobre lateral</small></div>
-        <div class="sensor"><span>diVacioOK</span><strong id="sVacioOK">0</strong><small>objeto sellando vacío</small></div>
-        <div class="sensor wide"><span>Sensor paquete</span><strong id="sLaser">— mm</strong><small id="sLaserInfo">altura / borde</small></div>
-        <div class="sensor"><span>Laterales</span><strong id="sLaterales">4</strong><small>disponibles</small></div>
+
+      <div class="motion-panel">
+        <div class="motion-tabs">
+          <button id="tabAxes" class="motion-tab active">Ejes</button>
+          <button id="tabControl" class="motion-tab">Control</button>
+        </div>
+
+        <div id="axesPane" class="motion-pane">
+          <div id="jointControls" class="joint-controls"></div>
+        </div>
+
+        <div id="controlPane" class="motion-pane hidden">
+          <div class="control-toolbar">
+            <label>Modo
+              <select id="jogMode">
+                <option value="j123">Ejes 1, 2 y 3</option>
+                <option value="j456">Ejes 4, 5 y 6</option>
+                <option value="linear">Lineal XYZ · IK</option>
+              </select>
+            </label>
+            <button id="vacuumToggle" class="vacuum-toggle">Aire OFF</button>
+            <span class="control-note" id="controlHint">Palancas: J1 · J2 · J3</span>
+          </div>
+
+          <div class="lever-bank">
+            <div class="lever-card">
+              <strong id="leverLabel0">J1</strong>
+              <input class="jog-lever" data-axis="0" type="range" min="-100" max="100" value="0" step="1">
+              <output id="leverValue0">0%</output>
+            </div>
+            <div class="lever-card">
+              <strong id="leverLabel1">J2</strong>
+              <input class="jog-lever" data-axis="1" type="range" min="-100" max="100" value="0" step="1">
+              <output id="leverValue1">0%</output>
+            </div>
+            <div class="lever-card">
+              <strong id="leverLabel2">J3</strong>
+              <input class="jog-lever" data-axis="2" type="range" min="-100" max="100" value="0" step="1">
+              <output id="leverValue2">0%</output>
+            </div>
+          </div>
+
+          <div class="control-indicators">
+            <div class="indicator" id="indAir"><span>Aire</span><b id="ctlAir">OFF</b><small>salida doVentosa</small></div>
+            <div class="indicator" id="indVacuum"><span>Vacío</span><b id="ctlVacuum">NO</b><small>objeto sellando copa</small></div>
+            <div class="indicator" id="indLateral"><span>Sensor lateral</span><b id="ctlLateral">NO</b><small>ventosa sobre lateral</small></div>
+            <div class="indicator" id="indPackage"><span>Sensor paquete</span><b id="ctlPackage">—</b><small id="ctlPackageInfo">sin lectura</small></div>
+          </div>
+        </div>
       </div>
-      <div id="jointControls" class="joint-controls"></div>
     </section>
 
     <section class="code-panel panel">
@@ -99,7 +144,7 @@
           <pre id="console"></pre>
         </div>
       </div>
-      <div class="support-note">Soporte actual: <code>MoveJ</code>, <code>MoveL</code>, <code>MoveAbsJ</code>, <code>Offs()</code>, <code>WaitTime</code>, <code>WaitDI</code>, <code>SetDO</code> y <code>TPWrite</code>. La celda usa <code>paquete.glb</code> y laterales individuales reconstruidos a partir de <code>lateral.glb</code>/<code>laterales.glb</code>.</div>
+      <div class="support-note">Soporte actual: <code>MoveJ</code>, <code>MoveL</code>, <code>MoveAbsJ</code>, <code>Offs()</code>, <code>WaitTime</code>, <code>WaitDI</code>, <code>SetDO</code> y <code>TPWrite</code>. La celda usa tus GLB del paquete y de los laterales.</div>
     </section>
   </main>
 
@@ -108,11 +153,11 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="src/config.js?v=4"></script>
-  <script src="src/robot-lite.js?v=4"></script>
-  <script src="src/robot.js?v=4"></script>
-  <script src="src/rapid.js?v=4"></script>
-  <script src="src/course.js?v=4"></script>
-  <script src="src/app.js?v=4"></script>
+  <script src="src/config.js?v=5"></script>
+  <script src="src/robot-lite.js?v=5"></script>
+  <script src="src/robot.js?v=5"></script>
+  <script src="src/rapid.js?v=5"></script>
+  <script src="src/course.js?v=5"></script>
+  <script src="src/app.js?v=5"></script>
 </body>
 </html>
