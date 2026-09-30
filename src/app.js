@@ -6,7 +6,7 @@
     tcpX:$('#tcpX'),tcpY:$('#tcpY'),tcpZ:$('#tcpZ'),state:$('#robotState'), console:$('#console'),
     run:$('#runBtn'),step:$('#stepBtn'),stop:$('#stopBtn'),home:$('#homeBtn'),cam:$('#resetCamBtn'),
     speed:$('#speedRange'),speedValue:$('#speedValue'),diPieza:$('#diPieza'),diPermiso:$('#diPermiso'),
-    doPinza:$('#doPinza'),doOK:$('#doOK'),clear:$('#clearConsole'),error:$('#threeError']
+    doPinza:$('#doPinza'),doOK:$('#doOK'),clear:$('#clearConsole'),error:$('#threeError'),rendererBadge:$('#rendererBadge')
   };
 
   const course=window.RobotLearnCourse;
@@ -96,9 +96,19 @@
   }
 
   try{
-    robot=new window.RobotLearnRobot(els.viewport,config.variants[els.variant.value]); robot.onChange=updateTelemetry;
+    const canUseThree = !!(window.THREE && window.THREE.OrbitControls && window.RobotLearnRobot);
+    const RendererClass = canUseThree ? window.RobotLearnRobot : window.RobotLearnRobotLite;
+    if(!RendererClass) throw new Error('No hay ningún renderizador 3D disponible');
+    robot=new RendererClass(els.viewport,config.variants[els.variant.value]); robot.onChange=updateTelemetry;
     rapid=new window.RobotLearnRapid(robot,io,log); buildJointControls(); updateTelemetry();
-  }catch(err){ els.error.classList.remove('hidden'); els.error.textContent=`No pude iniciar el 3D: ${err.message}`; log(err.message,'error'); }
+    els.rendererBadge.textContent = canUseThree ? '3D · Three.js' : '3D · offline';
+    els.rendererBadge.style.color = canUseThree ? '#bfe0ff' : '#a8f0cf';
+    els.rendererBadge.style.borderColor = canUseThree ? '#35536d' : '#285b45';
+    if(!canUseThree) log('CDN 3D no disponible: usando renderer Canvas offline.','warn');
+  }catch(err){
+    els.error.classList.remove('hidden'); els.error.textContent=`No pude iniciar el 3D: ${err.message}`;
+    els.rendererBadge.textContent='3D · error'; els.rendererBadge.style.color='#ffaaaa'; log(err.message,'error');
+  }
 
   initExamples();renderLessons();showLesson(0);bind();
   log('RobotLearn iniciado. El simulador usa cinemática IRB 4600 y un parser RAPID educativo.','ok');
