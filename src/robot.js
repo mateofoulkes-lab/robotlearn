@@ -4,9 +4,10 @@ window.RobotLearnRobot = class RobotLearnRobot {
     this.container=container; this.config=config; this.jointGroups=[]; this.angles=[0,0,0,0,0,0];
     this.axisLocal=[new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0),new THREE.Vector3(0,1,0),new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(1,0,0)];
     this.onChange=null; this.onSensors=null; this.onCellReady=null;
-    this.vacuumActive=false; this.toolLength=.165;
+    this.vacuumActive=false; this.toolDownLock=true; this.toolLength=.105;
     this.sensorState={sobreLateral:false,vacioOK:false,laserDistMM:null,bordePaquete:false,alturaPaqueteMM:null,lateralesRestantes:4};
     this.cell={ready:false,pieces:[],held:null,packageObj:null,stackGroup:null,scale:1,pickTargets:[],packageBox:null};
+    this.raycaster=new THREE.Raycaster(); this.down=new THREE.Vector3(0,0,-1);
     this._initScene(); this.setVariant(config); this._loadWorkcell(); this._animate();
   }
 
@@ -23,7 +24,7 @@ window.RobotLearnRobot = class RobotLearnRobot {
     const floor=new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshStandardMaterial({color:0x151a20,roughness:.98})); floor.receiveShadow=true; this.scene.add(floor);
     this.axes=new THREE.AxesHelper(.45); this.axes.position.z=.006; this.scene.add(this.axes);
     this.robotHolder=new THREE.Group(); this.workcellGroup=new THREE.Group(); this.scene.add(this.robotHolder); this.scene.add(this.workcellGroup);
-    this.tcpMarker=new THREE.Mesh(new THREE.SphereGeometry(.022,16,10),new THREE.MeshBasicMaterial({color:0x72b7ff})); this.scene.add(this.tcpMarker);
+    this.tcpMarker=new THREE.Mesh(new THREE.SphereGeometry(.018,16,10),new THREE.MeshBasicMaterial({color:0x72b7ff})); this.scene.add(this.tcpMarker);
     this.sensorBeam=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x62d394})); this.sensorBeam.visible=false; this.scene.add(this.sensorBeam);
     this._resize=()=>{const rw=this.container.clientWidth,rh=this.container.clientHeight;if(!rw||!rh)return;this.camera.aspect=rw/rh;this.camera.updateProjectionMatrix();this.renderer.setSize(rw,rh)};
     window.addEventListener('resize',this._resize); if(window.ResizeObserver)new ResizeObserver(this._resize).observe(this.container);
@@ -31,7 +32,7 @@ window.RobotLearnRobot = class RobotLearnRobot {
 
   setVariant(config){
     this.config=config; while(this.robotHolder.children.length)this.robotHolder.remove(this.robotHolder.children[0]);
-    this.jointGroups=[]; this.angles=[0,0,0,0,0,0]; this.toolTip=null; this.vacuumIndicator=null; this._buildRobot(); this.setHome();
+    this.jointGroups=[]; this.angles=[0,0,0,0,0,0]; this.toolTip=null; this.toolGroup=null; this.vacuumIndicator=null; this._buildRobot(); this.setHome();
   }
 
   _mat(color,metal=.12,rough=.55){return new THREE.MeshStandardMaterial({color,metalness:metal,roughness:rough})}
@@ -45,14 +46,16 @@ window.RobotLearnRobot = class RobotLearnRobot {
   }
 
   _buildVacuumTool(parent,metal,dark){
-    const tool=new THREE.Group();parent.add(tool);
-    const adapter=this._cylinderAlongAxis(.045,.05,new THREE.Vector3(1,0,0),metal,tool);adapter.position.x=.085;
-    const body=this._cylinderAlongAxis(.028,.065,new THREE.Vector3(1,0,0),metal,tool);body.position.x=.125;
-    const hose=this._cylinderAlongAxis(.009,.07,new THREE.Vector3(0,0,1),dark,tool);hose.position.set(.11,.03,.04);
+    const adapter=this._cylinderAlongAxis(.032,.055,new THREE.Vector3(1,0,0),metal,parent);adapter.position.x=.072;
+    const elbow=this._mesh(new THREE.SphereGeometry(.030,18,12),metal,parent);elbow.position.x=.100;
+    const tool=new THREE.Group(); tool.position.set(.100,0,0); parent.add(tool); this.toolGroup=tool;
+    const body=this._cylinderAlongAxis(.020,.060,new THREE.Vector3(0,0,1),metal,tool);body.position.z=-.034;
+    const hose=this._cylinderAlongAxis(.006,.048,new THREE.Vector3(1,0,0),dark,tool);hose.position.set(.024,0,-.020);
     const cupMat=this._mat(0x24282d,.04,.88);
-    const cup=this._mesh(new THREE.CylinderGeometry(.022,.014,.022,24),cupMat,tool);cup.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(1,0,0));cup.position.x=.158;
-    this.vacuumIndicator=this._mesh(new THREE.SphereGeometry(.010,12,8),new THREE.MeshBasicMaterial({color:0x66727e}),tool);this.vacuumIndicator.position.set(.115,-.032,.036);
-    this.toolTip=new THREE.Object3D();this.toolTip.position.x=this.toolLength;parent.add(this.toolTip);
+    const cup=this._mesh(new THREE.CylinderGeometry(.013,.008,.020,24),cupMat,tool);cup.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1));cup.position.z=-.073;
+    this.vacuumIndicator=this._mesh(new THREE.SphereGeometry(.008,12,8),new THREE.MeshBasicMaterial({color:0x66727e}),tool);this.vacuumIndicator.position.set(.025,0,-.042);
+    this.toolTip=new THREE.Object3D();this.toolTip.position.set(0,0,-this.toolLength);tool.add(this.toolTip);
+    this._alignTool();
   }
 
   _buildRobot(){
@@ -73,35 +76,63 @@ window.RobotLearnRobot = class RobotLearnRobot {
     this._makeAbbLabel(this.jointGroups[0]);this._buildVacuumTool(this.jointGroups[5],cap,dark);this.setVacuumActive(this.vacuumActive);
   }
 
+  setToolDownLock(active){this.toolDownLock=!!active;this._alignTool();this._changed()}
+  _alignTool(){
+    if(!this.toolGroup||!this.jointGroups[5])return;
+    if(!this.toolDownLock){this.toolGroup.quaternion.identity();this.robotHolder.updateMatrixWorld(true);return}
+    this.jointGroups[5].updateWorldMatrix(true,false);
+    const parentQ=new THREE.Quaternion();this.jointGroups[5].getWorldQuaternion(parentQ);
+    const yaw=(this.angles[0]||0)+(this.angles[5]||0),desired=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),yaw);
+    this.toolGroup.quaternion.copy(parentQ.clone().invert().multiply(desired));
+    this.robotHolder.updateMatrixWorld(true);
+  }
+
   _loadGLB(url){return new Promise((resolve,reject)=>{if(!THREE.GLTFLoader)return reject(new Error('GLTFLoader no disponible'));new THREE.GLTFLoader().load(url,g=>resolve(g.scene),undefined,reject)})}
-  _modelRoot(scene){const r=new THREE.Group();const s=scene.clone(true);s.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});r.add(s);r.rotation.x=Math.PI/2;r.updateMatrixWorld(true);return r}
+  _modelRoot(scene){const r=new THREE.Group(),s=scene.clone(true);s.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});r.add(s);r.rotation.x=Math.PI/2;r.updateMatrixWorld(true);return r}
   _box(obj){obj.updateMatrixWorld(true);return new THREE.Box3().setFromObject(obj)}
   _placeOnFloor(obj,x,y,z=.015){let b=this._box(obj),c=b.getCenter(new THREE.Vector3());obj.position.x+=x-c.x;obj.position.y+=y-c.y;obj.updateMatrixWorld(true);b=this._box(obj);obj.position.z+=z-b.min.z;obj.updateMatrixWorld(true)}
-  _makeLabel(text,color=0xffffff){const c=document.createElement('canvas');c.width=512;c.height=128;const x=c.getContext('2d');x.fillStyle='rgba(10,14,18,.78)';x.fillRect(0,0,512,128);x.fillStyle=`#${color.toString(16).padStart(6,'0')}`;x.font='700 54px Segoe UI,Arial';x.textAlign='center';x.textBaseline='middle';x.fillText(text,256,64);const tex=new THREE.CanvasTexture(c),mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});const sp=new THREE.Sprite(mat);sp.scale.set(.65,.16,1);return sp}
+
+  _pieceFromBakedMesh(mesh){
+    const geometry=mesh.geometry.clone(); geometry.applyMatrix4(mesh.matrixWorld); geometry.computeBoundingBox();
+    const center=geometry.boundingBox.getCenter(new THREE.Vector3()); geometry.translate(-center.x,-center.y,-center.z);
+    const material=Array.isArray(mesh.material)?mesh.material.map(m=>m.clone()):mesh.material.clone();
+    const part=new THREE.Group(),visual=new THREE.Mesh(geometry,material);visual.castShadow=true;visual.receiveShadow=true;part.add(visual);part.position.copy(center);return part;
+  }
+
+  _buildStackPieces(stackSrc,latSrc,scale){
+    const stackTemplate=this._modelRoot(stackSrc);stackTemplate.scale.setScalar(scale);stackTemplate.updateMatrixWorld(true);
+    const meshes=[];stackTemplate.traverse(o=>{if(o.isMesh)meshes.push(o)});
+    const parts=[];
+    if(meshes.length>=4){meshes.slice(0,4).forEach(m=>parts.push(this._pieceFromBakedMesh(m)))}
+    else{
+      const one=this._modelRoot(latSrc);one.scale.setScalar(scale);one.updateMatrixWorld(true);let src=null;one.traverse(o=>{if(!src&&o.isMesh)src=o});
+      if(!src)throw new Error('lateral.glb no contiene malla');
+      for(let i=0;i<4;i++){const p=this._pieceFromBakedMesh(src);p.position.add(new THREE.Vector3(i*.018,i*.018,-i*.018));parts.push(p)}
+    }
+    return parts;
+  }
 
   async _loadWorkcell(){
     if(!THREE.GLTFLoader)return;
     try{
-      const [pkgSrc,latSrc,stackSrc]=await Promise.all([this._loadGLB('paquete.glb'),this._loadGLB('lateral.glb'),this._loadGLB('laterales.glb')]);
+      this.cell.ready=false;
+      const [pkgSrc,latSrc,stackSrc]=await Promise.all([this._loadGLB('paquete.glb?v=5'),this._loadGLB('lateral.glb?v=5'),this._loadGLB('laterales.glb?v=5')]);
       while(this.workcellGroup.children.length)this.workcellGroup.remove(this.workcellGroup.children[0]);
-      const pkg=this._modelRoot(pkgSrc),latRef=this._modelRoot(latSrc),stackRef=this._modelRoot(stackSrc);
-      const rawPkg=this._box(pkg).getSize(new THREE.Vector3()),rawWidth=Math.max(rawPkg.x,rawPkg.y);
+      const pkg=this._modelRoot(pkgSrc),rawPkg=this._box(pkg).getSize(new THREE.Vector3()),rawWidth=Math.max(rawPkg.x,rawPkg.y);
       if(!Number.isFinite(rawWidth)||rawWidth<=0)throw new Error('paquete.glb no tiene dimensiones válidas');
-      const scale=.85/rawWidth;this.cell.scale=scale;pkg.scale.setScalar(scale);latRef.scale.setScalar(scale);stackRef.scale.setScalar(scale);pkg.updateMatrixWorld(true);latRef.updateMatrixWorld(true);stackRef.updateMatrixWorld(true);
+      const scale=.85/rawWidth;this.cell.scale=scale;pkg.scale.setScalar(scale);pkg.updateMatrixWorld(true);
       this.workcellGroup.add(pkg);this._placeOnFloor(pkg,1.15,-.92,.02);this.cell.packageObj=pkg;this.cell.packageBox=this._box(pkg);
-      const latSize=this._box(latRef).getSize(new THREE.Vector3()),stackSize=this._box(stackRef).getSize(new THREE.Vector3());
-      const L=[latSize.x,latSize.y,latSize.z],S=[stackSize.x,stackSize.y,stackSize.z];let axis=2,best=Infinity;
-      for(let i=0;i<3;i++){if(L[i]>.00001){const ratio=S[i]/L[i],score=Math.abs(ratio-4);if(ratio>1.5&&score<best){best=score;axis=i}}}
-      const spacing=(S[axis]||L[axis]*4)/4,stackGroup=new THREE.Group();this.workcellGroup.add(stackGroup);this.cell.stackGroup=stackGroup;this.cell.pieces=[];
-      for(let i=0;i<4;i++){
-        const p=this._modelRoot(latSrc);p.scale.setScalar(scale);p.position.set(0,0,0);p.position[['x','y','z'][axis]]=(i-1.5)*spacing;stackGroup.add(p);p.userData.index=i;p.userData.removedFromStack=false;this.cell.pieces.push(p);
-      }
+
+      const stackGroup=new THREE.Group();this.workcellGroup.add(stackGroup);this.cell.stackGroup=stackGroup;this.cell.pieces=[];
+      const parts=this._buildStackPieces(stackSrc,latSrc,scale);
+      parts.forEach((p,i)=>{stackGroup.add(p);p.userData.index=i;p.userData.removedFromStack=false;this.cell.pieces.push(p)});
       this._placeOnFloor(stackGroup,1.10,.92,.025);stackGroup.updateMatrixWorld(true);
-      this.cell.pieces.forEach(p=>{p.userData.homePosition=p.position.clone();p.userData.homeQuaternion=p.quaternion.clone();p.userData.homeScale=p.scale.clone();const b=this._box(p),c=b.getCenter(new THREE.Vector3());p.userData.pickTarget=[c.x*1000,c.y*1000,(b.max.z+.012)*1000]});
+
+      this.cell.pieces.forEach(p=>{
+        p.userData.homePosition=p.position.clone();p.userData.homeQuaternion=p.quaternion.clone();p.userData.homeScale=p.scale.clone();
+        const b=this._box(p),c=b.getCenter(new THREE.Vector3());p.userData.pickTarget=[c.x*1000,c.y*1000,(b.max.z+.010)*1000];
+      });
       this.cell.pickTargets=this.cell.pieces.map(p=>p.userData.pickTarget.slice()).sort((a,b)=>b[2]-a[2]);
-      const pb=this._box(pkg),pc=pb.getCenter(new THREE.Vector3());
-      const labP=this._makeLabel('PAQUETE',0xffc58f);labP.position.set(pc.x,pc.y,pb.max.z+.22);this.workcellGroup.add(labP);
-      const sb=this._box(stackGroup),sc=sb.getCenter(new THREE.Vector3());const labL=this._makeLabel('LATERALES',0xa8f0cf);labL.position.set(sc.x,sc.y,sb.max.z+.22);this.workcellGroup.add(labL);
       this.cell.ready=true;this._updateSensors(true);if(this.onCellReady)this.onCellReady(this.getCellTargets());
     }catch(err){console.warn('RobotLearn workcell:',err);this.cell.ready=false}
   }
@@ -114,18 +145,42 @@ window.RobotLearnRobot = class RobotLearnRobot {
 
   _pieceContact(tcp){
     if(!this.cell.ready)return null;let best=null;
-    for(const p of this.cell.pieces){if(p===this.cell.held)continue;const b=this._box(p),inside=tcp.x>=b.min.x-.025&&tcp.x<=b.max.x+.025&&tcp.y>=b.min.y-.025&&tcp.y<=b.max.y+.025,gap=tcp.z-b.max.z;if(inside&&gap>=-.018&&gap<.12&&(!best||gap<best.gap))best={piece:p,box:b,gap}}
+    for(const p of this.cell.pieces){
+      if(p===this.cell.held||p.userData.removedFromStack)continue;
+      this.raycaster.set(tcp,this.down);this.raycaster.near=0;this.raycaster.far=.14;
+      const hit=this.raycaster.intersectObject(p,true)[0];
+      if(hit&&(!best||hit.distance<best.gap))best={piece:p,point:hit.point.clone(),gap:hit.distance};
+    }
     return best;
   }
 
   _releaseHeld(){if(!this.cell.held)return;const p=this.cell.held;this.workcellGroup.attach(p);p.userData.removedFromStack=true;this.cell.held=null}
-  _tryPick(contact){if(!this.vacuumActive||this.cell.held||!contact||contact.gap>.028)return false;const p=contact.piece;this.toolTip.attach(p);p.userData.removedFromStack=true;this.cell.held=p;return true}
+  _tryPick(contact){
+    if(!this.vacuumActive||this.cell.held||!contact||contact.gap>.016)return false;
+    const p=contact.piece,tcp=this.getTCP().clone(),delta=tcp.clone().sub(contact.point);
+    this.toolTip.attach(p);
+    const q=new THREE.Quaternion();this.toolTip.getWorldQuaternion(q);p.position.add(delta.applyQuaternion(q.invert()));
+    p.userData.removedFromStack=true;this.cell.held=p;return true;
+  }
+
+  _packageReading(tcp){
+    if(!this.cell.ready||!this.cell.packageObj)return null;
+    this.raycaster.set(tcp,this.down);this.raycaster.near=0;this.raycaster.far=2.0;
+    const hit=this.raycaster.intersectObject(this.cell.packageObj,true)[0];if(!hit)return null;
+    const b=this._box(this.cell.packageObj),e=Math.min(Math.abs(hit.point.x-b.min.x),Math.abs(b.max.x-hit.point.x),Math.abs(hit.point.y-b.min.y),Math.abs(b.max.y-hit.point.y));
+    return {distance:hit.distance,point:hit.point.clone(),edge:e<.050,box:b};
+  }
 
   _updateSensors(force=false){
     const tcp=this.getTCP(),contact=this._pieceContact(tcp);if(this.vacuumActive&&!this.cell.held)this._tryPick(contact);
-    let laser=null,edge=false,height=null,pkgSeal=false;
-    if(this.cell.ready&&this.cell.packageObj){const b=this._box(this.cell.packageObj);this.cell.packageBox=b;height=b.max.z*1000;const over=tcp.x>=b.min.x&&tcp.x<=b.max.x&&tcp.y>=b.min.y&&tcp.y<=b.max.y;if(over&&tcp.z>=b.max.z){laser=(tcp.z-b.max.z)*1000;const e=Math.min(Math.abs(tcp.x-b.min.x),Math.abs(b.max.x-tcp.x),Math.abs(tcp.y-b.min.y),Math.abs(b.max.y-tcp.y));edge=e<.055;pkgSeal=laser<25;this.sensorBeam.visible=true;this.sensorBeam.geometry.setFromPoints([tcp,new THREE.Vector3(tcp.x,tcp.y,b.max.z)])}else this.sensorBeam.visible=false}else this.sensorBeam.visible=false;
-    const state={sobreLateral:!!contact,vacioOK:!!(this.vacuumActive&&(this.cell.held||(contact&&contact.gap<.025)||pkgSeal)),laserDistMM:Number.isFinite(laser)?laser:null,bordePaquete:edge,alturaPaqueteMM:Number.isFinite(height)?height:null,lateralesRestantes:this.cell.pieces.filter(p=>!p.userData.removedFromStack).length};
+    const pkg=this._packageReading(tcp);let laser=null,edge=false,height=null,pkgSeal=false;
+    if(pkg){laser=pkg.distance*1000;edge=pkg.edge;height=pkg.point.z*1000;pkgSeal=pkg.distance<.016;this.sensorBeam.visible=true;this.sensorBeam.geometry.setFromPoints([tcp,pkg.point])}else this.sensorBeam.visible=false;
+    const state={
+      sobreLateral:!!(contact&&contact.gap<.075),
+      vacioOK:!!(this.vacuumActive&&(this.cell.held||(contact&&contact.gap<.016)||pkgSeal)),
+      laserDistMM:Number.isFinite(laser)?laser:null,bordePaquete:edge,alturaPaqueteMM:Number.isFinite(height)?height:null,
+      lateralesRestantes:this.cell.pieces.filter(p=>!p.userData.removedFromStack).length
+    };
     const changed=force||JSON.stringify(state)!==JSON.stringify(this.sensorState);this.sensorState=state;if(changed&&this.onSensors)this.onSensors({...state});
   }
 
@@ -135,20 +190,20 @@ window.RobotLearnRobot = class RobotLearnRobot {
     if(!this.cell.ready||!this.cell.packageObj)return fallback;
     const pb=this._box(this.cell.packageObj),c=pb.getCenter(new THREE.Vector3()),z=(pb.max.z+.08)*1000;
     const picks=this.cell.pieces.map(p=>p.userData.pickTarget.slice()).sort((a,b)=>b[2]-a[2]);
-    const flanks=[[c.x,(pb.max.y+.05),pb.max.z+.10],[c.x,(pb.min.y-.05),pb.max.z+.10],[(pb.max.x+.05),c.y,pb.max.z+.10],[(pb.min.x-.05),c.y,pb.max.z+.10]].map(v=>v.map(n=>n*1000));
+    const flanks=[[c.x,pb.max.y+.05,pb.max.z+.10],[c.x,pb.min.y-.05,pb.max.z+.10],[pb.max.x+.05,c.y,pb.max.z+.10],[pb.min.x-.05,c.y,pb.max.z+.10]].map(v=>v.map(n=>n*1000));
     const inset=.07,scan=[[pb.min.x+inset,pb.min.y+inset,pb.max.z+.18],[pb.max.x-inset,pb.min.y+inset,pb.max.z+.18],[pb.max.x-inset,pb.max.y-inset,pb.max.z+.18],[pb.min.x+inset,pb.max.y-inset,pb.max.z+.18]].map(v=>v.map(n=>n*1000));
     return {picks,flanks,scan,packageTop:[c.x*1000,c.y*1000,z]};
   }
 
   setVacuumActive(active){this.vacuumActive=!!active;if(!active)this._releaseHeld();if(this.vacuumIndicator)this.vacuumIndicator.material.color.setHex(this.vacuumActive?0x53e49d:0x66727e);this._updateSensors(true)}
-  _applyAngle(i,a){if(!Number.isFinite(a))return;const[lo,hi]=this.config.limits[i];a=Math.max(lo,Math.min(hi,a));this.angles[i]=a;const g=this.jointGroups[i];if(!g)return;g.rotation.set(0,0,0);if(i===0)g.rotation.z=a;else if(i===1||i===2||i===4)g.rotation.y=a;else g.rotation.x=a;this.robotHolder.updateMatrixWorld(true);this._updateTCP()}
+  _applyAngle(i,a){if(!Number.isFinite(a))return;const[lo,hi]=this.config.limits[i];a=Math.max(lo,Math.min(hi,a));this.angles[i]=a;const g=this.jointGroups[i];if(!g)return;g.rotation.set(0,0,0);if(i===0)g.rotation.z=a;else if(i===1||i===2||i===4)g.rotation.y=a;else g.rotation.x=a;this.robotHolder.updateMatrixWorld(true);this._alignTool();this._updateTCP()}
   setJointRad(i,a){this._applyAngle(i,a);this._changed()} setJointDeg(i,d){this.setJointRad(i,d*Math.PI/180)} getJointDeg(){return this.angles.map(a=>a*180/Math.PI)}
   setHome(){[0,20,-35,0,35,0].forEach((d,i)=>this._applyAngle(i,d*Math.PI/180));this._changed()}
   resetCamera(){this.camera.up.set(0,0,1);this.camera.position.set(3.7,-4.2,2.9);this.controls.target.set(.75,0,.85);this.controls.update()}
-  getTCP(){if(!this.toolTip)return new THREE.Vector3();const p=new THREE.Vector3();this.toolTip.getWorldPosition(p);return p}
+  getTCP(){if(!this.toolTip)return new THREE.Vector3();this.robotHolder.updateMatrixWorld(true);const p=new THREE.Vector3();this.toolTip.getWorldPosition(p);return p}
   getTCPmm(){const p=this.getTCP();return{x:p.x*1000,y:p.y*1000,z:p.z*1000}}
-  _updateTCP(){const p=this.getTCP();this.tcpMarker.position.copy(p)}
-  _changed(){this._updateTCP();this._updateSensors();if(this.onChange)this.onChange(this)}
+  _updateTCP(){if(!this.toolTip)return;const p=this.getTCP();this.tcpMarker.position.copy(p)}
+  _changed(){this._alignTool();this._updateTCP();this._updateSensors();if(this.onChange)this.onChange(this)}
   _clampAngles(arr){return arr.map((a,i)=>Number.isFinite(a)?Math.max(this.config.limits[i][0],Math.min(this.config.limits[i][1],a)):NaN)}
 
   solveIK(targetMM){
@@ -166,7 +221,11 @@ window.RobotLearnRobot = class RobotLearnRobot {
     const start=this.angles.slice();let seconds=.12;for(let i=0;i<6;i++)seconds=Math.max(seconds,Math.abs(targetAngles[i]-start[i])/(this.config.maxSpeed[i]*Math.max(.1,speedFactor)));seconds=Math.min(3.4,Math.max(.12,seconds));
     return new Promise(resolve=>{const t0=performance.now(),tick=now=>{const t=Math.min(1,(now-t0)/(seconds*1000)),e=t*t*(3-2*t);for(let i=0;i<6;i++)this._applyAngle(i,start[i]+(targetAngles[i]-start[i])*e);this._changed();if(t<1)requestAnimationFrame(tick);else resolve()};requestAnimationFrame(tick)})
   }
-  async moveJ(targetMM,speedFactor=1){return this.animateJoints(this.solveIK(targetMM),speedFactor)}
-  async moveL(targetMM,speedFactor=1){const s=this.getTCPmm(),e={x:targetMM[0],y:targetMM[1],z:targetMM[2]},dist=Math.hypot(e.x-s.x,e.y-s.y,e.z-s.z),steps=Math.max(8,Math.min(42,Math.ceil(dist/50)));for(let k=1;k<=steps;k++){const t=k/steps,p=[s.x+(e.x-s.x)*t,s.y+(e.y-s.y)*t,s.z+(e.z-s.z)*t];await this.animateJoints(this.solveIK(p),Math.max(1.8,speedFactor*3))}}
-  _animate(){requestAnimationFrame(()=>this._animate());this.controls.update();this._updateTCP();this._updateSensors();this.renderer.render(this.scene,this.camera)}
+
+  jogLinearDelta(dx,dy,dz){
+    this.setToolDownLock(true);const p=this.getTCPmm(),target=[p.x+dx,p.y+dy,p.z+dz],angles=this.solveIK(target);angles.forEach((a,i)=>this._applyAngle(i,a));this._changed();return true;
+  }
+  async moveJ(targetMM,speedFactor=1){this.setToolDownLock(true);return this.animateJoints(this.solveIK(targetMM),speedFactor)}
+  async moveL(targetMM,speedFactor=1){this.setToolDownLock(true);const s=this.getTCPmm(),e={x:targetMM[0],y:targetMM[1],z:targetMM[2]},dist=Math.hypot(e.x-s.x,e.y-s.y,e.z-s.z),steps=Math.max(8,Math.min(42,Math.ceil(dist/50)));for(let k=1;k<=steps;k++){const t=k/steps,p=[s.x+(e.x-s.x)*t,s.y+(e.y-s.y)*t,s.z+(e.z-s.z)*t];await this.animateJoints(this.solveIK(p),Math.max(1.8,speedFactor*3))}}
+  _animate(){requestAnimationFrame(()=>this._animate());this.controls.update();this._alignTool();this._updateTCP();this._updateSensors();this.renderer.render(this.scene,this.camera)}
 };
