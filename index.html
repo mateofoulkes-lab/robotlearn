@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>RobotLearn — RAPID + ABB IRB 4600</title>
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <header class="topbar">
@@ -25,15 +25,28 @@
 
   <main class="workspace">
     <aside class="course-panel panel">
-      <div class="panel-title"><span>Curso</span><span id="progressText">0 / 8</span></div>
-      <div id="lessonList" class="lesson-list"></div>
-      <article id="lessonContent" class="lesson-content"></article>
+      <div class="panel-title course-head">
+        <div class="course-tabs">
+          <button id="tabCourse" class="tab active">Curso</button>
+          <button id="tabExamples" class="tab">Ejemplos <b id="exampleCount">0</b></button>
+        </div>
+        <span id="progressText">0 / 8</span>
+      </div>
+      <div id="courseView" class="course-view">
+        <div id="lessonList" class="lesson-list"></div>
+        <article id="lessonContent" class="lesson-content"></article>
+      </div>
+      <div id="examplesView" class="examples-view hidden">
+        <div class="examples-intro">Biblioteca completa. Cada botón carga el código en el Playground.</div>
+        <div id="exampleLibrary" class="example-library"></div>
+      </div>
     </aside>
 
     <section class="sim-panel panel">
       <div class="panel-title">
-        <span>Simulador 3D</span>
+        <span>Simulador 3D · celda de laterales</span>
         <div class="sim-buttons">
+          <button id="resetCellBtn" class="ghost">Reponer laterales</button>
           <button id="homeBtn" class="ghost">Home</button>
           <button id="resetCamBtn" class="ghost">Cámara</button>
         </div>
@@ -46,6 +59,12 @@
         <div><span>TCP Y</span><strong id="tcpY">0</strong><small>mm</small></div>
         <div><span>TCP Z</span><strong id="tcpZ">0</strong><small>mm</small></div>
         <div><span>Estado</span><strong id="robotState">Listo</strong></div>
+      </div>
+      <div class="sensor-strip">
+        <div class="sensor"><span>diSobreLateral</span><strong id="sSobreLateral">0</strong><small>ventosa sobre lateral</small></div>
+        <div class="sensor"><span>diVacioOK</span><strong id="sVacioOK">0</strong><small>objeto sellando vacío</small></div>
+        <div class="sensor wide"><span>Sensor paquete</span><strong id="sLaser">— mm</strong><small id="sLaserInfo">altura / borde</small></div>
+        <div class="sensor"><span>Laterales</span><strong id="sLaterales">4</strong><small>disponibles</small></div>
       </div>
       <div id="jointControls" class="joint-controls"></div>
     </section>
@@ -68,6 +87,10 @@
           <h3>I/O</h3>
           <label><input type="checkbox" id="diPieza"> DI diPieza</label>
           <label><input type="checkbox" id="diPermiso"> DI diPermiso</label>
+          <div class="output"><span>DI diSobreLateral</span><b id="ioSobreLateral">0</b></div>
+          <div class="output"><span>DI diVacioOK</span><b id="ioVacioOK">0</b></div>
+          <div class="output"><span>AI aiDistPaquete</span><b id="ioDistPaquete">—</b></div>
+          <div class="output"><span>DI diBordePaquete</span><b id="ioBordePaquete">0</b></div>
           <div class="output"><span>DO doVentosa</span><b id="doVentosa">0</b></div>
           <div class="output"><span>DO doOK</span><b id="doOK">0</b></div>
         </div>
@@ -76,22 +99,20 @@
           <pre id="console"></pre>
         </div>
       </div>
-      <div class="support-note">Soporte actual: <code>MoveJ</code>, <code>MoveL</code>, <code>MoveAbsJ</code>, <code>Offs()</code>, <code>WaitTime</code>, <code>WaitDI</code>, <code>SetDO</code> y <code>TPWrite</code>. Las poses inválidas se rechazan sin romper el estado del robot.</div>
+      <div class="support-note">Soporte actual: <code>MoveJ</code>, <code>MoveL</code>, <code>MoveAbsJ</code>, <code>Offs()</code>, <code>WaitTime</code>, <code>WaitDI</code>, <code>SetDO</code> y <code>TPWrite</code>. La celda usa <code>paquete.glb</code> y laterales individuales reconstruidos a partir de <code>lateral.glb</code>/<code>laterales.glb</code>.</div>
     </section>
   </main>
 
-  <footer>
-    RobotLearn no es RobotStudio ni un Virtual Controller de ABB. Está pensado para aprendizaje, visualización y práctica segura de conceptos RAPID.
-  </footer>
+  <footer>RobotLearn es un simulador educativo. No reemplaza RobotStudio ni un Virtual Controller ABB.</footer>
 
-  <!-- Three.js mejora el render si la red lo permite. RobotLearn NO depende de él: robot-lite.js funciona offline. -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="src/config.js?v=3"></script>
-  <script src="src/robot-lite.js?v=3"></script>
-  <script src="src/robot.js?v=3"></script>
-  <script src="src/rapid.js?v=3"></script>
-  <script src="src/course.js?v=3"></script>
-  <script src="src/app.js?v=3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="src/config.js?v=4"></script>
+  <script src="src/robot-lite.js?v=4"></script>
+  <script src="src/robot.js?v=4"></script>
+  <script src="src/rapid.js?v=4"></script>
+  <script src="src/course.js?v=4"></script>
+  <script src="src/app.js?v=4"></script>
 </body>
 </html>
