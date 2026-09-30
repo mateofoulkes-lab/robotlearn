@@ -1,233 +1,98 @@
 (() => {
-  const $ = s => document.querySelector(s);
-  const els = {
-    viewport:$('#viewport'), variant:$('#variantSelect'), editor:$('#editor'), examples:$('#exampleSelect'),
-    lessonList:$('#lessonList'), lessonContent:$('#lessonContent'), progress:$('#progressText'), joints:$('#jointControls'),
-    tcpX:$('#tcpX'),tcpY:$('#tcpY'),tcpZ:$('#tcpZ'),state:$('#robotState'), console:$('#console'),
-    run:$('#runBtn'),step:$('#stepBtn'),stop:$('#stopBtn'),home:$('#homeBtn'),cam:$('#resetCamBtn'),
-    speed:$('#speedRange'),speedValue:$('#speedValue'),diPieza:$('#diPieza'),diPermiso:$('#diPermiso'),
-    doVentosa:$('#doVentosa'),doOK:$('#doOK'),clear:$('#clearConsole'),error:$('#threeError'),rendererBadge:$('#rendererBadge')
+  const $=s=>document.querySelector(s);
+  const els={
+    viewport:$('#viewport'),variant:$('#variantSelect'),editor:$('#editor'),examples:$('#exampleSelect'),lessonList:$('#lessonList'),lessonContent:$('#lessonContent'),progress:$('#progressText'),joints:$('#jointControls'),
+    tcpX:$('#tcpX'),tcpY:$('#tcpY'),tcpZ:$('#tcpZ'),state:$('#robotState'),console:$('#console'),run:$('#runBtn'),step:$('#stepBtn'),stop:$('#stopBtn'),home:$('#homeBtn'),cam:$('#resetCamBtn'),resetCell:$('#resetCellBtn'),
+    speed:$('#speedRange'),speedValue:$('#speedValue'),diPieza:$('#diPieza'),diPermiso:$('#diPermiso'),doVentosa:$('#doVentosa'),doOK:$('#doOK'),clear:$('#clearConsole'),error:$('#threeError'),rendererBadge:$('#rendererBadge'),
+    tabCourse:$('#tabCourse'),tabExamples:$('#tabExamples'),courseView:$('#courseView'),examplesView:$('#examplesView'),exampleLibrary:$('#exampleLibrary'),exampleCount:$('#exampleCount'),
+    sSobre:$('#sSobreLateral'),sVacio:$('#sVacioOK'),sLaser:$('#sLaser'),sLaserInfo:$('#sLaserInfo'),sLaterales:$('#sLaterales'),ioSobre:$('#ioSobreLateral'),ioVacio:$('#ioVacioOK'),ioDist:$('#ioDistPaquete'),ioBorde:$('#ioBordePaquete')
   };
-
-  const course=window.RobotLearnCourse;
-  const config=window.RobotLearnConfig;
-  let robot=null, rapid=null, activeLesson=0, compiledSource='';
+  const course=window.RobotLearnCourse,config=window.RobotLearnConfig;
+  let robot=null,rapid=null,activeLesson=0,compiledSource='';
   const completed=new Set(JSON.parse(localStorage.getItem('robotlearn-completed')||'[]'));
 
   function log(text,type=''){
-    const time=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    const mark=type==='error'?'✖ ':type==='warn'?'⚠ ':type==='ok'?'✓ ':type==='tp'?'▸ ':'';
-    els.console.textContent += `[${time}] ${mark}${text}\n`;
-    els.console.scrollTop=els.console.scrollHeight;
+    const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}),mark=type==='error'?'✖ ':type==='warn'?'⚠ ':type==='ok'?'✓ ':type==='tp'?'▸ ':'';
+    els.console.textContent+=`[${time}] ${mark}${text}\n`;els.console.scrollTop=els.console.scrollHeight;
   }
 
   const outputs={doVentosa:0,doPinza:0,doOK:0};
   const io={
     getDI(name){
-      if(name==='diPieza') return els.diPieza.checked;
-      if(name==='diPermiso') return els.diPermiso.checked;
+      if(name==='diPieza')return els.diPieza.checked;if(name==='diPermiso')return els.diPermiso.checked;
+      const s=robot&&robot.getSensors?robot.getSensors():{};
+      if(name==='diSobreLateral')return !!s.sobreLateral;if(name==='diVacioOK')return !!s.vacioOK;if(name==='diBordePaquete')return !!s.bordePaquete;
       return false;
     },
     setDO(name,value){
       outputs[name]=value;
-      if(name==='doVentosa' || name==='doPinza'){
-        outputs.doVentosa=value;
-        outputs.doPinza=value;
-        if(els.doVentosa){
-          els.doVentosa.textContent=value;
-          els.doVentosa.style.color=value?'#4ad295':'#98a6b5';
-        }
-        if(robot && robot.setVacuumActive) robot.setVacuumActive(!!value);
+      if(name==='doVentosa'||name==='doPinza'){
+        outputs.doVentosa=value;outputs.doPinza=value;
+        if(els.doVentosa){els.doVentosa.textContent=value;els.doVentosa.style.color=value?'#4ad295':'#98a6b5'}
+        if(robot&&robot.setVacuumActive)robot.setVacuumActive(!!value);
       }
-      if(name==='doOK' && els.doOK){
-        els.doOK.textContent=value;
-        els.doOK.style.color=value?'#4ad295':'#98a6b5';
-      }
+      if(name==='doOK'&&els.doOK){els.doOK.textContent=value;els.doOK.style.color=value?'#4ad295':'#98a6b5'}
       log(`${name} ← ${value}`,'ok');
     }
   };
 
   function updateTelemetry(){
-    if(!robot) return;
-    const p=robot.getTCPmm();
-    if([p.x,p.y,p.z].every(Number.isFinite)){
-      els.tcpX.textContent=p.x.toFixed(0);
-      els.tcpY.textContent=p.y.toFixed(0);
-      els.tcpZ.textContent=p.z.toFixed(0);
-    }
-    const degs=robot.getJointDeg();
-    document.querySelectorAll('.joint').forEach((card,i)=>{
-      const input=card.querySelector('input'), value=card.querySelector('.joint-value');
-      if(Number.isFinite(degs[i])){
-        if(document.activeElement!==input) input.value=degs[i].toFixed(1);
-        value.textContent=`${degs[i].toFixed(1)}°`;
-      }
-    });
+    if(!robot)return;const p=robot.getTCPmm();if([p.x,p.y,p.z].every(Number.isFinite)){els.tcpX.textContent=p.x.toFixed(0);els.tcpY.textContent=p.y.toFixed(0);els.tcpZ.textContent=p.z.toFixed(0)}
+    const degs=robot.getJointDeg();document.querySelectorAll('.joint').forEach((card,i)=>{const input=card.querySelector('input'),value=card.querySelector('.joint-value');if(Number.isFinite(degs[i])){if(document.activeElement!==input)input.value=degs[i].toFixed(1);value.textContent=`${degs[i].toFixed(1)}°`}});
+  }
+
+  function updateSensors(s={}){
+    const on=(el,v)=>{if(!el)return;el.textContent=v?1:0;el.parentElement.classList.toggle('on',!!v)};
+    on(els.sSobre,s.sobreLateral);on(els.sVacio,s.vacioOK);if(els.ioSobre)els.ioSobre.textContent=s.sobreLateral?1:0;if(els.ioVacio)els.ioVacio.textContent=s.vacioOK?1:0;
+    if(els.sLaser)els.sLaser.textContent=Number.isFinite(s.laserDistMM)?`${Math.round(s.laserDistMM)} mm`:'— mm';
+    if(els.sLaserInfo){const h=Number.isFinite(s.alturaPaqueteMM)?`altura paquete ${Math.round(s.alturaPaqueteMM)} mm`:'sin lectura';els.sLaserInfo.textContent=s.bordePaquete?`${h} · BORDE`:`${h} · interior`;els.sLaserInfo.parentElement.classList.toggle('edge',!!s.bordePaquete)}
+    if(els.sLaterales)els.sLaterales.textContent=Number.isFinite(s.lateralesRestantes)?s.lateralesRestantes:'—';
+    if(els.ioDist)els.ioDist.textContent=Number.isFinite(s.laserDistMM)?Math.round(s.laserDistMM):'—';if(els.ioBorde)els.ioBorde.textContent=s.bordePaquete?1:0;
   }
 
   function buildJointControls(){
-    if(!robot) return;
-    els.joints.innerHTML='';
-    robot.config.limitsDeg.forEach(([lo,hi],i)=>{
-      const card=document.createElement('div');
-      card.className='joint';
-      card.innerHTML=`<div class="joint-head"><strong>J${i+1}</strong><span class="joint-value">0°</span></div><input type="range" min="${lo}" max="${hi}" step="0.5" value="0"><div class="joint-head"><small>${lo}°</small><small>${hi}°</small></div>`;
-      const input=card.querySelector('input');
-      input.addEventListener('input',()=>robot.setJointDeg(i,Number(input.value)));
-      els.joints.appendChild(card);
-    });
-    updateTelemetry();
+    if(!robot)return;els.joints.innerHTML='';robot.config.limitsDeg.forEach(([lo,hi],i)=>{const card=document.createElement('div');card.className='joint';card.innerHTML=`<div class="joint-head"><strong>J${i+1}</strong><span class="joint-value">0°</span></div><input type="range" min="${lo}" max="${hi}" step="0.5" value="0"><div class="joint-head"><small>${lo}°</small><small>${hi}°</small></div>`;const input=card.querySelector('input');input.addEventListener('input',()=>robot.setJointDeg(i,Number(input.value)));els.joints.appendChild(card)});updateTelemetry();
   }
 
-  function setVariant(key){
-    if(!robot) return;
-    robot.setVariant(config.variants[key]);
-    buildJointControls();
-    log(`Robot: ${config.variants[key].label} · alcance ${config.variants[key].reach.toFixed(2)} m · payload ${config.variants[key].payload} kg`,'ok');
-  }
-
+  function setVariant(key){if(!robot)return;robot.setVariant(config.variants[key]);buildJointControls();log(`Robot: ${config.variants[key].label} · alcance ${config.variants[key].reach.toFixed(2)} m · payload ${config.variants[key].payload} kg`,'ok')}
+  function codeFor(ex){const ctx=robot&&robot.getCellTargets?robot.getCellTargets():null;return typeof ex.code==='function'?ex.code(ctx):ex.code}
   function loadExample(key){
-    const ex=course.examples[key];
-    if(!ex) return;
-    if(rapid && rapid.running){
-      rapid.stop();
-      log('Cargué el nuevo ejemplo; esperá a que termine el movimiento actual antes de ejecutarlo.','warn');
-    }
-    els.editor.value=ex.code;
-    compiledSource='';
-    if(rapid) rapid.rewind();
-    log(`Ejemplo cargado: ${ex.title}`);
+    const ex=course.examples[key];if(!ex)return;if(rapid&&rapid.running){rapid.stop();log('Deteniendo el ejemplo anterior antes de cargar el nuevo.','warn')}
+    els.editor.value=codeFor(ex);compiledSource='';if(rapid)rapid.rewind();els.examples.value=key;log(`Ejemplo cargado: ${ex.title}`);
   }
 
   function initExamples(){
-    Object.entries(course.examples).forEach(([key,ex])=>{
-      const o=document.createElement('option');
-      o.value=key;
-      o.textContent=ex.title;
-      els.examples.appendChild(o);
+    els.examples.innerHTML='';els.exampleLibrary.innerHTML='';const entries=Object.entries(course.examples);els.exampleCount.textContent=entries.length;
+    entries.forEach(([key,ex])=>{
+      const o=document.createElement('option');o.value=key;o.textContent=ex.title;els.examples.appendChild(o);
+      const b=document.createElement('button');b.className='example-card';b.innerHTML=`<strong>${ex.title}</strong><small>${ex.description||'Cargar en el Playground'}</small>`;b.onclick=()=>{loadExample(key);showExamples(false)};els.exampleLibrary.appendChild(b);
     });
-    els.examples.addEventListener('change',()=>loadExample(els.examples.value));
-    loadExample('hello');
+    els.examples.addEventListener('change',()=>loadExample(els.examples.value));loadExample('hello');
   }
 
-  function saveProgress(){
-    localStorage.setItem('robotlearn-completed',JSON.stringify([...completed]));
-    els.progress.textContent=`${completed.size} / ${course.lessons.length}`;
-  }
-
+  function showExamples(show){els.examplesView.classList.toggle('hidden',!show);els.courseView.classList.toggle('hidden',show);els.tabExamples.classList.toggle('active',show);els.tabCourse.classList.toggle('active',!show)}
+  function saveProgress(){localStorage.setItem('robotlearn-completed',JSON.stringify([...completed]));els.progress.textContent=`${completed.size} / ${course.lessons.length}`}
   function showLesson(i){
-    activeLesson=i;
-    document.querySelectorAll('.lesson-btn').forEach((b,j)=>b.classList.toggle('active',i===j));
-    const lesson=course.lessons[i];
-    els.lessonContent.innerHTML=lesson.html;
-    if(lesson.example){
-      const btn=document.createElement('button');
-      btn.className='try';
-      btn.textContent='Cargar este ejemplo en el Playground';
-      btn.onclick=()=>{els.examples.value=lesson.example;loadExample(lesson.example);};
-      els.lessonContent.appendChild(btn);
-    }
-    const done=document.createElement('button');
-    done.className='try';
-    done.textContent=completed.has(i)?'✓ Lección completada':'Marcar lección como completada';
-    done.onclick=()=>{completed.add(i);saveProgress();renderLessons();showLesson(i);};
-    els.lessonContent.appendChild(done);
+    activeLesson=i;document.querySelectorAll('.lesson-btn').forEach((b,j)=>b.classList.toggle('active',i===j));const lesson=course.lessons[i];els.lessonContent.innerHTML=lesson.html;
+    if(lesson.example){const b=document.createElement('button');b.className='try';b.textContent='Cargar este ejemplo en el Playground';b.onclick=()=>loadExample(lesson.example);els.lessonContent.appendChild(b)}
+    const done=document.createElement('button');done.className='try';done.textContent=completed.has(i)?'✓ Lección completada':'Marcar lección como completada';done.onclick=()=>{completed.add(i);saveProgress();renderLessons();showLesson(i)};els.lessonContent.appendChild(done);
   }
-
-  function renderLessons(){
-    els.lessonList.innerHTML='';
-    course.lessons.forEach((lesson,i)=>{
-      const b=document.createElement('button');
-      b.className=`lesson-btn ${i===activeLesson?'active':''} ${completed.has(i)?'done':''}`;
-      b.textContent=lesson.title;
-      b.onclick=()=>showLesson(i);
-      els.lessonList.appendChild(b);
-    });
-    saveProgress();
-  }
-
-  function ensureCompiled(reset=false){
-    if(!rapid) return false;
-    const src=els.editor.value;
-    if(reset || src!==compiledSource){
-      const commands=rapid.compile(src);
-      compiledSource=src;
-      if(reset) rapid.rewind();
-      log(`Compilado: ${commands.length} instrucciones ejecutables`);
-    }
-    return true;
-  }
-
-  async function runProgram(){
-    if(!rapid) return;
-    if(rapid.running){
-      log('Todavía hay un movimiento en curso. Esperá a que termine o presioná Stop.','warn');
-      return;
-    }
-    if(!ensureCompiled(true)) return;
-    els.state.textContent='RUN';
-    els.state.style.color='#4ad295';
-    rapid.speedFactor=Number(els.speed.value);
-    await rapid.run();
-    els.state.textContent='Listo';
-    els.state.style.color='';
-    updateTelemetry();
-  }
-
-  async function stepProgram(){
-    if(!rapid) return;
-    if(rapid.running){
-      log('Todavía hay un movimiento en curso.','warn');
-      return;
-    }
-    if(!ensureCompiled(false)) return;
-    els.state.textContent='STEP';
-    rapid.speedFactor=Number(els.speed.value);
-    await rapid.step();
-    els.state.textContent='Listo';
-    updateTelemetry();
-  }
+  function renderLessons(){els.lessonList.innerHTML='';course.lessons.forEach((lesson,i)=>{const b=document.createElement('button');b.className=`lesson-btn ${i===activeLesson?'active':''} ${completed.has(i)?'done':''}`;b.textContent=lesson.title;b.onclick=()=>showLesson(i);els.lessonList.appendChild(b)});saveProgress()}
+  function ensureCompiled(reset=false){if(!rapid)return false;const src=els.editor.value;if(reset||src!==compiledSource){const commands=rapid.compile(src);compiledSource=src;if(reset)rapid.rewind();log(`Compilado: ${commands.length} instrucciones ejecutables`)}return true}
+  async function runProgram(){if(!rapid)return;if(rapid.running){log('Todavía hay un movimiento en curso. Esperá o presioná Stop.','warn');return}if(!ensureCompiled(true))return;els.state.textContent='RUN';els.state.style.color='#4ad295';rapid.speedFactor=Number(els.speed.value);await rapid.run();els.state.textContent='Listo';els.state.style.color='';updateTelemetry()}
+  async function stepProgram(){if(!rapid||rapid.running)return;if(!ensureCompiled(false))return;els.state.textContent='STEP';rapid.speedFactor=Number(els.speed.value);await rapid.step();els.state.textContent='Listo';updateTelemetry()}
 
   function bind(){
-    els.variant.addEventListener('change',()=>setVariant(els.variant.value));
-    els.home.addEventListener('click',()=>robot&&robot.setHome());
-    els.cam.addEventListener('click',()=>robot&&robot.resetCamera());
-    els.run.addEventListener('click',runProgram);
-    els.step.addEventListener('click',stepProgram);
-    els.stop.addEventListener('click',()=>{
-      if(rapid) rapid.stop();
-      els.state.textContent='STOP';
-      els.state.style.color='#ff6b6b';
-    });
-    els.speed.addEventListener('input',()=>els.speedValue.textContent=`${Number(els.speed.value).toFixed(1)}×`);
-    els.clear.addEventListener('click',()=>els.console.textContent='');
-    els.editor.addEventListener('input',()=>compiledSource='');
+    els.variant.addEventListener('change',()=>setVariant(els.variant.value));els.home.addEventListener('click',()=>robot&&robot.setHome());els.cam.addEventListener('click',()=>robot&&robot.resetCamera());els.resetCell.addEventListener('click',()=>{if(robot&&robot.resetCell){robot.resetCell();log('Laterales repuestos en la pila.','ok')}});
+    els.run.addEventListener('click',runProgram);els.step.addEventListener('click',stepProgram);els.stop.addEventListener('click',()=>{if(rapid)rapid.stop();els.state.textContent='STOP';els.state.style.color='#ff6b6b'});els.speed.addEventListener('input',()=>els.speedValue.textContent=`${Number(els.speed.value).toFixed(1)}×`);els.clear.addEventListener('click',()=>els.console.textContent='');els.editor.addEventListener('input',()=>compiledSource='');
+    els.tabCourse.addEventListener('click',()=>showExamples(false));els.tabExamples.addEventListener('click',()=>showExamples(true));
   }
 
   try{
-    const canUseThree = !!(window.THREE && window.THREE.OrbitControls && window.RobotLearnRobot);
-    const RendererClass = canUseThree ? window.RobotLearnRobot : window.RobotLearnRobotLite;
-    if(!RendererClass) throw new Error('No hay ningún renderizador 3D disponible');
-    robot=new RendererClass(els.viewport,config.variants[els.variant.value]);
-    robot.onChange=updateTelemetry;
-    rapid=new window.RobotLearnRapid(robot,io,log);
-    buildJointControls();
-    updateTelemetry();
-    els.rendererBadge.textContent = canUseThree ? '3D · Three.js' : '3D · offline';
-    els.rendererBadge.style.color = canUseThree ? '#bfe0ff' : '#a8f0cf';
-    els.rendererBadge.style.borderColor = canUseThree ? '#35536d' : '#285b45';
-    if(!canUseThree) log('CDN 3D no disponible: usando renderer Canvas offline.','warn');
-  }catch(err){
-    els.error.classList.remove('hidden');
-    els.error.textContent=`No pude iniciar el 3D: ${err.message}`;
-    els.rendererBadge.textContent='3D · error';
-    els.rendererBadge.style.color='#ffaaaa';
-    log(err.message,'error');
-  }
+    const canUseThree=!!(window.THREE&&window.THREE.OrbitControls&&window.RobotLearnRobot),RendererClass=canUseThree?window.RobotLearnRobot:window.RobotLearnRobotLite;if(!RendererClass)throw new Error('No hay renderizador 3D disponible');
+    robot=new RendererClass(els.viewport,config.variants[els.variant.value]);robot.onChange=updateTelemetry;robot.onSensors=updateSensors;robot.onCellReady=()=>{log('Celda cargada: paquete a 850 mm de ancho + 4 laterales.','ok');updateSensors(robot.getSensors());};rapid=new window.RobotLearnRapid(robot,io,log);buildJointControls();updateTelemetry();updateSensors(robot.getSensors?robot.getSensors():{});
+    els.rendererBadge.textContent=canUseThree?'3D · Three.js':'3D · offline';els.rendererBadge.style.color=canUseThree?'#bfe0ff':'#a8f0cf';els.rendererBadge.style.borderColor=canUseThree?'#35536d':'#285b45';if(!canUseThree)log('Renderer Canvas offline: los GLB de la celda requieren Three.js/GLTFLoader.','warn');
+  }catch(err){els.error.classList.remove('hidden');els.error.textContent=`No pude iniciar el 3D: ${err.message}`;els.rendererBadge.textContent='3D · error';els.rendererBadge.style.color='#ffaaaa';log(err.message,'error')}
 
-  initExamples();
-  renderLessons();
-  showLesson(0);
-  bind();
-  log('RobotLearn iniciado. IRB 4600 blanco, ventosa y protección contra poses inválidas activadas.','ok');
+  initExamples();renderLessons();showLesson(0);showExamples(false);bind();log('RobotLearn iniciado. Biblioteca de ejemplos y sensores de celda activos.','ok');
 })();
