@@ -19,7 +19,7 @@
         </select>
       </label>
       <span class="pill">IRC5 / M2004</span>
-      <span class="pill warning">Simulador educativo</span>
+      <span id="rendererBadge" class="pill warning">3D iniciando…</span>
     </div>
   </header>
 
@@ -39,7 +39,7 @@
         </div>
       </div>
       <div id="viewport" class="viewport">
-        <div id="threeError" class="three-error hidden">No se pudo cargar el motor 3D. Revisá si esta red bloquea jsDelivr.</div>
+        <div id="threeError" class="three-error hidden"></div>
       </div>
       <div class="telemetry">
         <div><span>TCP X</span><strong id="tcpX">0</strong><small>mm</small></div>
@@ -84,9 +84,11 @@
     RobotLearn no es RobotStudio ni un Virtual Controller de ABB. Está pensado para aprendizaje, visualización y práctica segura de conceptos RAPID.
   </footer>
 
+  <!-- Three.js mejora el render si la red lo permite. RobotLearn NO depende de él: robot-lite.js funciona offline. -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="src/config.js"></script>
+  <script src="src/robot-lite.js"></script>
   <script src="src/robot.js"></script>
   <script src="src/rapid.js"></script>
   <script src="src/course.js"></script>
