@@ -4,7 +4,7 @@ window.RobotLearnRobot = class RobotLearnRobot {
     this.container=container; this.config=config; this.jointGroups=[]; this.angles=[0,0,0,0,0,0];
     this.axisLocal=[new THREE.Vector3(0,0,1),new THREE.Vector3(0,1,0),new THREE.Vector3(0,1,0),new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(1,0,0)];
     this.onChange=null; this.onSensors=null; this.onCellReady=null;
-    this.vacuumActive=false; this.toolDownLock=true; this.toolLength=.105;
+    this.vacuumActive=false; this.toolDownLock=true; this.toolLength=.083;
     this.sensorState={sobreLateral:false,vacioOK:false,laserDistMM:null,bordePaquete:false,alturaPaqueteMM:null,lateralesRestantes:4};
     this.cell={ready:false,pieces:[],held:null,packageObj:null,stackGroup:null,scale:1,pickTargets:[],packageBox:null};
     this.raycaster=new THREE.Raycaster(); this.down=new THREE.Vector3(0,0,-1);
@@ -30,174 +30,34 @@ window.RobotLearnRobot = class RobotLearnRobot {
     window.addEventListener('resize',this._resize); if(window.ResizeObserver)new ResizeObserver(this._resize).observe(this.container);
   }
 
-  setVariant(config){
-    this.config=config; while(this.robotHolder.children.length)this.robotHolder.remove(this.robotHolder.children[0]);
-    this.jointGroups=[]; this.angles=[0,0,0,0,0,0]; this.toolTip=null; this.toolGroup=null; this.vacuumIndicator=null; this._buildRobot(); this.setHome();
-  }
-
+  setVariant(config){this.config=config;while(this.robotHolder.children.length)this.robotHolder.remove(this.robotHolder.children[0]);this.jointGroups=[];this.angles=[0,0,0,0,0,0];this.toolTip=null;this.toolGroup=null;this.vacuumIndicator=null;this._buildRobot();this.setHome()}
   _mat(color,metal=.12,rough=.55){return new THREE.MeshStandardMaterial({color,metalness:metal,roughness:rough})}
   _mesh(geo,mat,parent){const m=new THREE.Mesh(geo,mat);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
   _cylinderAlongAxis(radius,length,axis,mat,parent){const m=this._mesh(new THREE.CylinderGeometry(radius,radius,length,28),mat,parent);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),axis.clone().normalize());return m}
   _beam(vec,radius,mat,parent){const len=vec.length();if(len<1e-5)return;const dir=vec.clone().normalize();const b=this._mesh(new THREE.CylinderGeometry(radius*.82,radius,len,24),mat,parent);b.position.copy(vec.clone().multiplyScalar(.5));b.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);const s=this._mesh(new THREE.BoxGeometry(radius*.92,radius*.68,len*.86),mat,parent);s.position.copy(vec.clone().multiplyScalar(.5));s.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),dir)}
-
-  _makeAbbLabel(parent){
-    const c=document.createElement('canvas');c.width=512;c.height=180;const x=c.getContext('2d');x.fillStyle='#d71920';x.font='900 112px Arial Black,Arial,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('ABB',256,94);
-    const t=new THREE.CanvasTexture(c),m=new THREE.MeshBasicMaterial({map:t,transparent:true,side:THREE.DoubleSide,depthWrite:false});const p=this._mesh(new THREE.PlaneGeometry(.26,.09),m,parent);p.position.set(.10,-.215,.055);p.rotation.x=Math.PI/2;
-  }
-
-  _buildVacuumTool(parent,metal,dark){
-    const adapter=this._cylinderAlongAxis(.032,.055,new THREE.Vector3(1,0,0),metal,parent);adapter.position.x=.072;
-    const elbow=this._mesh(new THREE.SphereGeometry(.030,18,12),metal,parent);elbow.position.x=.100;
-    const tool=new THREE.Group(); tool.position.set(.100,0,0); parent.add(tool); this.toolGroup=tool;
-    const body=this._cylinderAlongAxis(.020,.060,new THREE.Vector3(0,0,1),metal,tool);body.position.z=-.034;
-    const hose=this._cylinderAlongAxis(.006,.048,new THREE.Vector3(1,0,0),dark,tool);hose.position.set(.024,0,-.020);
-    const cupMat=this._mat(0x24282d,.04,.88);
-    const cup=this._mesh(new THREE.CylinderGeometry(.013,.008,.020,24),cupMat,tool);cup.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1));cup.position.z=-.073;
-    this.vacuumIndicator=this._mesh(new THREE.SphereGeometry(.008,12,8),new THREE.MeshBasicMaterial({color:0x66727e}),tool);this.vacuumIndicator.position.set(.025,0,-.042);
-    this.toolTip=new THREE.Object3D();this.toolTip.position.set(0,0,-this.toolLength);tool.add(this.toolTip);
-    this._alignTool();
-  }
-
-  _buildRobot(){
-    const body=this._mat(0xe7e8e4,.10,.50),body2=this._mat(0xd6d9d9,.12,.48),dark=this._mat(0x252a2f,.34,.38),cap=this._mat(0xc9ced1,.45,.28),black=this._mat(0x121417,.28,.48);
-    const basePlate=this._mesh(new THREE.BoxGeometry(.58,.58,.075),dark,this.robotHolder);basePlate.position.z=.0375;
-    const foot=this._mesh(new THREE.CylinderGeometry(.29,.33,.19,40),body,this.robotHolder);foot.rotation.x=Math.PI/2;foot.position.z=.165;
-    const pedestal=this._mesh(new THREE.CylinderGeometry(.22,.27,.33,36),body,this.robotHolder);pedestal.rotation.x=Math.PI/2;pedestal.position.z=.33;
-    const motor=this._mesh(new THREE.BoxGeometry(.30,.28,.23),dark,this.robotHolder);motor.position.set(-.23,0,.31);
-    let parent=this.robotHolder;
-    for(let i=0;i<6;i++){
-      const off=new THREE.Vector3(...this.config.offsets[i]),anchor=new THREE.Group();anchor.position.copy(off);parent.add(anchor);const joint=new THREE.Group();anchor.add(joint);this.jointGroups.push(joint);
-      const axis=this.axisLocal[i],jr=[.21,.205,.18,.135,.115,.095][i],jl=[.26,.34,.32,.25,.22,.16][i];this._cylinderAlongAxis(jr,jl,axis,i<3?body:dark,joint);this._cylinderAlongAxis(jr*.61,jl*1.04,axis,cap,joint);
-      if(i<5){const next=new THREE.Vector3(...this.config.offsets[i+1]),radius=[.18,.145,.13,.11,.085][i];this._beam(next,radius,i===3?body2:body,joint);if(i===1||i===3){const cable=this._mesh(new THREE.CylinderGeometry(.018,.018,Math.max(.12,next.length()*.72),10),black,joint);cable.position.copy(next.clone().multiplyScalar(.5));cable.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),next.clone().normalize());cable.position.y+=.13}}
-      else{const f=this._cylinderAlongAxis(.105,.065,new THREE.Vector3(1,0,0),cap,joint);f.position.x=.035;const r=this._cylinderAlongAxis(.075,.078,new THREE.Vector3(1,0,0),dark,joint);r.position.x=.07}
-      parent=joint;
-    }
-    const shoulder=this._mesh(new THREE.BoxGeometry(.36,.42,.38),body,this.jointGroups[0]);shoulder.position.set(.08,0,.04);const elbow=this._mesh(new THREE.BoxGeometry(.38,.34,.28),body,this.jointGroups[2]);elbow.position.set(.02,0,.05);
-    this._makeAbbLabel(this.jointGroups[0]);this._buildVacuumTool(this.jointGroups[5],cap,dark);this.setVacuumActive(this.vacuumActive);
-  }
-
+  _makeAbbLabel(parent){const c=document.createElement('canvas');c.width=512;c.height=180;const x=c.getContext('2d');x.fillStyle='#d71920';x.font='900 112px Arial Black,Arial,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('ABB',256,94);const t=new THREE.CanvasTexture(c),m=new THREE.MeshBasicMaterial({map:t,transparent:true,side:THREE.DoubleSide,depthWrite:false});const p=this._mesh(new THREE.PlaneGeometry(.26,.09),m,parent);p.position.set(.10,-.215,.055);p.rotation.x=Math.PI/2}
+  _buildVacuumTool(parent,metal,dark){const adapter=this._cylinderAlongAxis(.032,.055,new THREE.Vector3(1,0,0),metal,parent);adapter.position.x=.072;const elbow=this._mesh(new THREE.SphereGeometry(.030,18,12),metal,parent);elbow.position.x=.100;const tool=new THREE.Group();tool.position.set(.100,0,0);parent.add(tool);this.toolGroup=tool;const body=this._cylinderAlongAxis(.020,.060,new THREE.Vector3(0,0,1),metal,tool);body.position.z=-.034;const hose=this._cylinderAlongAxis(.006,.048,new THREE.Vector3(1,0,0),dark,tool);hose.position.set(.024,0,-.020);const cupMat=this._mat(0x24282d,.04,.88);const cup=this._mesh(new THREE.CylinderGeometry(.013,.008,.020,24),cupMat,tool);cup.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1));cup.position.z=-.073;this.vacuumIndicator=this._mesh(new THREE.SphereGeometry(.008,12,8),new THREE.MeshBasicMaterial({color:0x66727e}),tool);this.vacuumIndicator.position.set(.025,0,-.042);this.toolTip=new THREE.Object3D();this.toolTip.position.set(0,0,-this.toolLength);tool.add(this.toolTip);this._alignTool()}
+  _buildRobot(){const body=this._mat(0xe7e8e4,.10,.50),body2=this._mat(0xd6d9d9,.12,.48),dark=this._mat(0x252a2f,.34,.38),cap=this._mat(0xc9ced1,.45,.28),black=this._mat(0x121417,.28,.48);const basePlate=this._mesh(new THREE.BoxGeometry(.58,.58,.075),dark,this.robotHolder);basePlate.position.z=.0375;const foot=this._mesh(new THREE.CylinderGeometry(.29,.33,.19,40),body,this.robotHolder);foot.rotation.x=Math.PI/2;foot.position.z=.165;const pedestal=this._mesh(new THREE.CylinderGeometry(.22,.27,.33,36),body,this.robotHolder);pedestal.rotation.x=Math.PI/2;pedestal.position.z=.33;const motor=this._mesh(new THREE.BoxGeometry(.30,.28,.23),dark,this.robotHolder);motor.position.set(-.23,0,.31);let parent=this.robotHolder;for(let i=0;i<6;i++){const off=new THREE.Vector3(...this.config.offsets[i]),anchor=new THREE.Group();anchor.position.copy(off);parent.add(anchor);const joint=new THREE.Group();anchor.add(joint);this.jointGroups.push(joint);const axis=this.axisLocal[i],jr=[.21,.205,.18,.135,.115,.095][i],jl=[.26,.34,.32,.25,.22,.16][i];this._cylinderAlongAxis(jr,jl,axis,i<3?body:dark,joint);this._cylinderAlongAxis(jr*.61,jl*1.04,axis,cap,joint);if(i<5){const next=new THREE.Vector3(...this.config.offsets[i+1]),radius=[.18,.145,.13,.11,.085][i];this._beam(next,radius,i===3?body2:body,joint);if(i===1||i===3){const cable=this._mesh(new THREE.CylinderGeometry(.018,.018,Math.max(.12,next.length()*.72),10),black,joint);cable.position.copy(next.clone().multiplyScalar(.5));cable.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),next.clone().normalize());cable.position.y+=.13}}else{const f=this._cylinderAlongAxis(.105,.065,new THREE.Vector3(1,0,0),cap,joint);f.position.x=.035;const r=this._cylinderAlongAxis(.075,.078,new THREE.Vector3(1,0,0),dark,joint);r.position.x=.07}parent=joint}const shoulder=this._mesh(new THREE.BoxGeometry(.36,.42,.38),body,this.jointGroups[0]);shoulder.position.set(.08,0,.04);const elbow=this._mesh(new THREE.BoxGeometry(.38,.34,.28),body,this.jointGroups[2]);elbow.position.set(.02,0,.05);this._makeAbbLabel(this.jointGroups[0]);this._buildVacuumTool(this.jointGroups[5],cap,dark);this.setVacuumActive(this.vacuumActive)}
   setToolDownLock(active){this.toolDownLock=!!active;this._alignTool();this._changed()}
-  _alignTool(){
-    if(!this.toolGroup||!this.jointGroups[5])return;
-    if(!this.toolDownLock){this.toolGroup.quaternion.identity();this.robotHolder.updateMatrixWorld(true);return}
-    this.jointGroups[5].updateWorldMatrix(true,false);
-    const parentQ=new THREE.Quaternion();this.jointGroups[5].getWorldQuaternion(parentQ);
-    const yaw=(this.angles[0]||0)+(this.angles[5]||0),desired=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),yaw);
-    this.toolGroup.quaternion.copy(parentQ.clone().invert().multiply(desired));
-    this.robotHolder.updateMatrixWorld(true);
-  }
-
+  _alignTool(){if(!this.toolGroup||!this.jointGroups[5])return;if(!this.toolDownLock){this.toolGroup.quaternion.identity();this.robotHolder.updateMatrixWorld(true);return}this.jointGroups[5].updateWorldMatrix(true,false);const parentQ=new THREE.Quaternion();this.jointGroups[5].getWorldQuaternion(parentQ);const yaw=(this.angles[0]||0)+(this.angles[5]||0),desired=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),yaw);this.toolGroup.quaternion.copy(parentQ.clone().invert().multiply(desired));this.robotHolder.updateMatrixWorld(true)}
   _loadGLB(url){return new Promise((resolve,reject)=>{if(!THREE.GLTFLoader)return reject(new Error('GLTFLoader no disponible'));new THREE.GLTFLoader().load(url,g=>resolve(g.scene),undefined,reject)})}
   _modelRoot(scene){const r=new THREE.Group(),s=scene.clone(true);s.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});r.add(s);r.rotation.x=Math.PI/2;r.updateMatrixWorld(true);return r}
   _box(obj){obj.updateMatrixWorld(true);return new THREE.Box3().setFromObject(obj)}
   _placeOnFloor(obj,x,y,z=.015){let b=this._box(obj),c=b.getCenter(new THREE.Vector3());obj.position.x+=x-c.x;obj.position.y+=y-c.y;obj.updateMatrixWorld(true);b=this._box(obj);obj.position.z+=z-b.min.z;obj.updateMatrixWorld(true)}
-
-  _pieceFromBakedMesh(mesh){
-    const geometry=mesh.geometry.clone(); geometry.applyMatrix4(mesh.matrixWorld); geometry.computeBoundingBox();
-    const center=geometry.boundingBox.getCenter(new THREE.Vector3()); geometry.translate(-center.x,-center.y,-center.z);
-    const material=Array.isArray(mesh.material)?mesh.material.map(m=>m.clone()):mesh.material.clone();
-    const part=new THREE.Group(),visual=new THREE.Mesh(geometry,material);visual.castShadow=true;visual.receiveShadow=true;part.add(visual);part.position.copy(center);return part;
-  }
-
-  _buildStackPieces(stackSrc,latSrc,scale){
-    const stackTemplate=this._modelRoot(stackSrc);stackTemplate.scale.setScalar(scale);stackTemplate.updateMatrixWorld(true);
-    const meshes=[];stackTemplate.traverse(o=>{if(o.isMesh)meshes.push(o)});
-    const parts=[];
-    if(meshes.length>=4){meshes.slice(0,4).forEach(m=>parts.push(this._pieceFromBakedMesh(m)))}
-    else{
-      const one=this._modelRoot(latSrc);one.scale.setScalar(scale);one.updateMatrixWorld(true);let src=null;one.traverse(o=>{if(!src&&o.isMesh)src=o});
-      if(!src)throw new Error('lateral.glb no contiene malla');
-      for(let i=0;i<4;i++){const p=this._pieceFromBakedMesh(src);p.position.add(new THREE.Vector3(i*.018,i*.018,-i*.018));parts.push(p)}
-    }
-    return parts;
-  }
-
-  async _loadWorkcell(){
-    if(!THREE.GLTFLoader)return;
-    try{
-      this.cell.ready=false;
-      const [pkgSrc,latSrc,stackSrc]=await Promise.all([this._loadGLB('paquete.glb?v=5'),this._loadGLB('lateral.glb?v=5'),this._loadGLB('laterales.glb?v=5')]);
-      while(this.workcellGroup.children.length)this.workcellGroup.remove(this.workcellGroup.children[0]);
-      const pkg=this._modelRoot(pkgSrc),rawPkg=this._box(pkg).getSize(new THREE.Vector3()),rawWidth=Math.max(rawPkg.x,rawPkg.y);
-      if(!Number.isFinite(rawWidth)||rawWidth<=0)throw new Error('paquete.glb no tiene dimensiones válidas');
-      const scale=.85/rawWidth;this.cell.scale=scale;pkg.scale.setScalar(scale);pkg.updateMatrixWorld(true);
-      this.workcellGroup.add(pkg);this._placeOnFloor(pkg,1.15,-.92,.02);this.cell.packageObj=pkg;this.cell.packageBox=this._box(pkg);
-
-      const stackGroup=new THREE.Group();this.workcellGroup.add(stackGroup);this.cell.stackGroup=stackGroup;this.cell.pieces=[];
-      const parts=this._buildStackPieces(stackSrc,latSrc,scale);
-      parts.forEach((p,i)=>{stackGroup.add(p);p.userData.index=i;p.userData.removedFromStack=false;this.cell.pieces.push(p)});
-      this._placeOnFloor(stackGroup,1.10,.92,.025);stackGroup.updateMatrixWorld(true);
-
-      this.cell.pieces.forEach(p=>{
-        p.userData.homePosition=p.position.clone();p.userData.homeQuaternion=p.quaternion.clone();p.userData.homeScale=p.scale.clone();
-        const b=this._box(p),c=b.getCenter(new THREE.Vector3());p.userData.pickTarget=[c.x*1000,c.y*1000,(b.max.z+.010)*1000];
-      });
-      this.cell.pickTargets=this.cell.pieces.map(p=>p.userData.pickTarget.slice()).sort((a,b)=>b[2]-a[2]);
-      this.cell.ready=true;this._updateSensors(true);if(this.onCellReady)this.onCellReady(this.getCellTargets());
-    }catch(err){console.warn('RobotLearn workcell:',err);this.cell.ready=false}
-  }
-
-  resetCell(){
-    this.setVacuumActive(false);if(!this.cell.ready)return;
-    this.cell.pieces.forEach(p=>{if(p.parent!==this.cell.stackGroup)this.cell.stackGroup.attach(p);p.position.copy(p.userData.homePosition);p.quaternion.copy(p.userData.homeQuaternion);p.scale.copy(p.userData.homeScale);p.userData.removedFromStack=false;p.visible=true});
-    this.cell.held=null;this.cell.stackGroup.updateMatrixWorld(true);this._updateSensors(true);
-  }
-
-  _pieceContact(tcp){
-    if(!this.cell.ready)return null;let best=null;
-    for(const p of this.cell.pieces){
-      if(p===this.cell.held||p.userData.removedFromStack)continue;
-      this.raycaster.set(tcp,this.down);this.raycaster.near=0;this.raycaster.far=.14;
-      const hit=this.raycaster.intersectObject(p,true)[0];
-      if(hit&&(!best||hit.distance<best.gap))best={piece:p,point:hit.point.clone(),gap:hit.distance};
-    }
-    return best;
-  }
-
+  _pieceFromBakedMesh(mesh){const geometry=mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);geometry.computeBoundingBox();const center=geometry.boundingBox.getCenter(new THREE.Vector3());geometry.translate(-center.x,-center.y,-center.z);const material=Array.isArray(mesh.material)?mesh.material.map(m=>m.clone()):mesh.material.clone();const part=new THREE.Group(),visual=new THREE.Mesh(geometry,material);visual.castShadow=true;visual.receiveShadow=true;part.add(visual);part.position.copy(center);return part}
+  _buildStackPieces(stackSrc,latSrc,scale){const stackTemplate=this._modelRoot(stackSrc);stackTemplate.scale.setScalar(scale);stackTemplate.updateMatrixWorld(true);const meshes=[];stackTemplate.traverse(o=>{if(o.isMesh)meshes.push(o)});const parts=[];if(meshes.length>=4){meshes.slice(0,4).forEach(m=>parts.push(this._pieceFromBakedMesh(m)))}else{const one=this._modelRoot(latSrc);one.scale.setScalar(scale);one.updateMatrixWorld(true);let src=null;one.traverse(o=>{if(!src&&o.isMesh)src=o});if(!src)throw new Error('lateral.glb no contiene malla');for(let i=0;i<4;i++){const p=this._pieceFromBakedMesh(src);p.position.add(new THREE.Vector3(i*.018,i*.018,-i*.018));parts.push(p)}}return parts}
+  async _loadWorkcell(){if(!THREE.GLTFLoader)return;try{this.cell.ready=false;const[pkgSrc,latSrc,stackSrc]=await Promise.all([this._loadGLB('paquete.glb?v=5'),this._loadGLB('lateral.glb?v=5'),this._loadGLB('laterales.glb?v=5')]);while(this.workcellGroup.children.length)this.workcellGroup.remove(this.workcellGroup.children[0]);const pkg=this._modelRoot(pkgSrc),rawPkg=this._box(pkg).getSize(new THREE.Vector3()),rawWidth=Math.max(rawPkg.x,rawPkg.y);if(!Number.isFinite(rawWidth)||rawWidth<=0)throw new Error('paquete.glb no tiene dimensiones válidas');const scale=.85/rawWidth;this.cell.scale=scale;pkg.scale.setScalar(scale);pkg.updateMatrixWorld(true);this.workcellGroup.add(pkg);this._placeOnFloor(pkg,1.15,-.92,.02);this.cell.packageObj=pkg;this.cell.packageBox=this._box(pkg);const stackGroup=new THREE.Group();this.workcellGroup.add(stackGroup);this.cell.stackGroup=stackGroup;this.cell.pieces=[];const parts=this._buildStackPieces(stackSrc,latSrc,scale);parts.forEach((p,i)=>{stackGroup.add(p);p.userData.index=i;p.userData.removedFromStack=false;this.cell.pieces.push(p)});this._placeOnFloor(stackGroup,1.10,.92,.025);stackGroup.updateMatrixWorld(true);this.cell.pieces.forEach(p=>{p.userData.homePosition=p.position.clone();p.userData.homeQuaternion=p.quaternion.clone();p.userData.homeScale=p.scale.clone();const b=this._box(p),c=b.getCenter(new THREE.Vector3());p.userData.pickTarget=[c.x*1000,c.y*1000,(b.max.z+.010)*1000]});this.cell.pickTargets=this.cell.pieces.map(p=>p.userData.pickTarget.slice()).sort((a,b)=>b[2]-a[2]);this.cell.ready=true;this._updateSensors(true);if(this.onCellReady)this.onCellReady(this.getCellTargets())}catch(err){console.warn('RobotLearn workcell:',err);this.cell.ready=false}}
+  resetCell(){this.setVacuumActive(false);if(!this.cell.ready)return;this.cell.pieces.forEach(p=>{if(p.parent!==this.cell.stackGroup)this.cell.stackGroup.attach(p);p.position.copy(p.userData.homePosition);p.quaternion.copy(p.userData.homeQuaternion);p.scale.copy(p.userData.homeScale);p.userData.removedFromStack=false;p.visible=true});this.cell.held=null;this.cell.stackGroup.updateMatrixWorld(true);this._updateSensors(true)}
+  _pieceContact(tcp){if(!this.cell.ready)return null;let best=null;for(const p of this.cell.pieces){if(p===this.cell.held||p.userData.removedFromStack)continue;this.raycaster.set(tcp,this.down);this.raycaster.near=0;this.raycaster.far=.14;const hit=this.raycaster.intersectObject(p,true)[0];if(hit&&(!best||hit.distance<best.gap))best={piece:p,point:hit.point.clone(),gap:hit.distance}}return best}
   _releaseHeld(){if(!this.cell.held)return;const p=this.cell.held;this.workcellGroup.attach(p);p.userData.removedFromStack=true;this.cell.held=null}
-  _tryPick(contact){
-    if(!this.vacuumActive||this.cell.held||!contact||contact.gap>.016)return false;
-    const p=contact.piece,tcp=this.getTCP().clone(),delta=tcp.clone().sub(contact.point);
-    this.toolTip.attach(p);
-    const q=new THREE.Quaternion();this.toolTip.getWorldQuaternion(q);p.position.add(delta.applyQuaternion(q.invert()));
-    p.userData.removedFromStack=true;this.cell.held=p;return true;
-  }
-
-  _packageReading(tcp){
-    if(!this.cell.ready||!this.cell.packageObj)return null;
-    this.raycaster.set(tcp,this.down);this.raycaster.near=0;this.raycaster.far=2.0;
-    const hit=this.raycaster.intersectObject(this.cell.packageObj,true)[0];if(!hit)return null;
-    const b=this._box(this.cell.packageObj),e=Math.min(Math.abs(hit.point.x-b.min.x),Math.abs(b.max.x-hit.point.x),Math.abs(hit.point.y-b.min.y),Math.abs(b.max.y-hit.point.y));
-    return {distance:hit.distance,point:hit.point.clone(),edge:e<.050,box:b};
-  }
-
-  _updateSensors(force=false){
-    const tcp=this.getTCP(),contact=this._pieceContact(tcp);if(this.vacuumActive&&!this.cell.held)this._tryPick(contact);
-    const pkg=this._packageReading(tcp);let laser=null,edge=false,height=null,pkgSeal=false;
-    if(pkg){laser=pkg.distance*1000;edge=pkg.edge;height=pkg.point.z*1000;pkgSeal=pkg.distance<.016;this.sensorBeam.visible=true;this.sensorBeam.geometry.setFromPoints([tcp,pkg.point])}else this.sensorBeam.visible=false;
-    const state={
-      sobreLateral:!!(contact&&contact.gap<.075),
-      vacioOK:!!(this.vacuumActive&&(this.cell.held||(contact&&contact.gap<.016)||pkgSeal)),
-      laserDistMM:Number.isFinite(laser)?laser:null,bordePaquete:edge,alturaPaqueteMM:Number.isFinite(height)?height:null,
-      lateralesRestantes:this.cell.pieces.filter(p=>!p.userData.removedFromStack).length
-    };
-    const changed=force||JSON.stringify(state)!==JSON.stringify(this.sensorState);this.sensorState=state;if(changed&&this.onSensors)this.onSensors({...state});
-  }
-
-  getSensors(){return {...this.sensorState}}
-  getCellTargets(){
-    const fallback={picks:[[1100,920,500],[1100,920,470],[1100,920,440],[1100,920,410]],flanks:[[1150,-450,650],[1150,-1390,650],[1580,-920,650],[720,-920,650]],scan:[[950,-1150,900],[1350,-1150,900],[1350,-700,900],[950,-700,900]],packageTop:[1150,-920,850]};
-    if(!this.cell.ready||!this.cell.packageObj)return fallback;
-    const pb=this._box(this.cell.packageObj),c=pb.getCenter(new THREE.Vector3()),z=(pb.max.z+.08)*1000;
-    const picks=this.cell.pieces.map(p=>p.userData.pickTarget.slice()).sort((a,b)=>b[2]-a[2]);
-    const flanks=[[c.x,pb.max.y+.05,pb.max.z+.10],[c.x,pb.min.y-.05,pb.max.z+.10],[pb.max.x+.05,c.y,pb.max.z+.10],[pb.min.x-.05,c.y,pb.max.z+.10]].map(v=>v.map(n=>n*1000));
-    const inset=.07,scan=[[pb.min.x+inset,pb.min.y+inset,pb.max.z+.18],[pb.max.x-inset,pb.min.y+inset,pb.max.z+.18],[pb.max.x-inset,pb.max.y-inset,pb.max.z+.18],[pb.min.x+inset,pb.max.y-inset,pb.max.z+.18]].map(v=>v.map(n=>n*1000));
-    return {picks,flanks,scan,packageTop:[c.x*1000,c.y*1000,z]};
-  }
-
+  _tryPick(contact){if(!this.vacuumActive||this.cell.held||!contact||contact.gap>.016)return false;const p=contact.piece,tcp=this.getTCP().clone(),delta=tcp.clone().sub(contact.point);this.toolTip.attach(p);const q=new THREE.Quaternion();this.toolTip.getWorldQuaternion(q);p.position.add(delta.applyQuaternion(q.invert()));p.userData.removedFromStack=true;this.cell.held=p;return true}
+  _packageReading(tcp){if(!this.cell.ready||!this.cell.packageObj)return null;this.raycaster.set(tcp,this.down);this.raycaster.near=0;this.raycaster.far=2;const hit=this.raycaster.intersectObject(this.cell.packageObj,true)[0];if(!hit)return null;const b=this._box(this.cell.packageObj),e=Math.min(Math.abs(hit.point.x-b.min.x),Math.abs(b.max.x-hit.point.x),Math.abs(hit.point.y-b.min.y),Math.abs(b.max.y-hit.point.y));return{distance:hit.distance,point:hit.point.clone(),edge:e<.050,box:b}}
+  _updateSensors(force=false){const tcp=this.getTCP(),contact=this._pieceContact(tcp);if(this.vacuumActive&&!this.cell.held)this._tryPick(contact);const pkg=this._packageReading(tcp);let laser=null,edge=false,height=null,pkgSeal=false;if(pkg){laser=pkg.distance*1000;edge=pkg.edge;height=pkg.point.z*1000;pkgSeal=pkg.distance<.016;this.sensorBeam.visible=true;this.sensorBeam.geometry.setFromPoints([tcp,pkg.point])}else this.sensorBeam.visible=false;const state={sobreLateral:!!(contact&&contact.gap<.075),vacioOK:!!(this.vacuumActive&&(this.cell.held||(contact&&contact.gap<.016)||pkgSeal)),laserDistMM:Number.isFinite(laser)?laser:null,bordePaquete:edge,alturaPaqueteMM:Number.isFinite(height)?height:null,lateralesRestantes:this.cell.pieces.filter(p=>!p.userData.removedFromStack).length};const changed=force||JSON.stringify(state)!==JSON.stringify(this.sensorState);this.sensorState=state;if(changed&&this.onSensors)this.onSensors({...state})}
+  getSensors(){return{...this.sensorState}}
+  getCellTargets(){const fallback={picks:[[1100,920,500],[1100,920,470],[1100,920,440],[1100,920,410]],flanks:[[1150,-450,650],[1150,-1390,650],[1580,-920,650],[720,-920,650]],scan:[[950,-1150,900],[1350,-1150,900],[1350,-700,900],[950,-700,900]],packageTop:[1150,-920,850]};if(!this.cell.ready||!this.cell.packageObj)return fallback;const pb=this._box(this.cell.packageObj),c=pb.getCenter(new THREE.Vector3()),z=(pb.max.z+.08)*1000;const picks=this.cell.pieces.map(p=>p.userData.pickTarget.slice()).sort((a,b)=>b[2]-a[2]);const flanks=[[c.x,pb.max.y+.05,pb.max.z+.10],[c.x,pb.min.y-.05,pb.max.z+.10],[pb.max.x+.05,c.y,pb.max.z+.10],[pb.min.x-.05,c.y,pb.max.z+.10]].map(v=>v.map(n=>n*1000));const inset=.07,scan=[[pb.min.x+inset,pb.min.y+inset,pb.max.z+.18],[pb.max.x-inset,pb.min.y+inset,pb.max.z+.18],[pb.max.x-inset,pb.max.y-inset,pb.max.z+.18],[pb.min.x+inset,pb.max.y-inset,pb.max.z+.18]].map(v=>v.map(n=>n*1000));return{picks,flanks,scan,packageTop:[c.x*1000,c.y*1000,z]}}
   setVacuumActive(active){this.vacuumActive=!!active;if(!active)this._releaseHeld();if(this.vacuumIndicator)this.vacuumIndicator.material.color.setHex(this.vacuumActive?0x53e49d:0x66727e);this._updateSensors(true)}
   _applyAngle(i,a){if(!Number.isFinite(a))return;const[lo,hi]=this.config.limits[i];a=Math.max(lo,Math.min(hi,a));this.angles[i]=a;const g=this.jointGroups[i];if(!g)return;g.rotation.set(0,0,0);if(i===0)g.rotation.z=a;else if(i===1||i===2||i===4)g.rotation.y=a;else g.rotation.x=a;this.robotHolder.updateMatrixWorld(true);this._alignTool();this._updateTCP()}
-  setJointRad(i,a){this._applyAngle(i,a);this._changed()} setJointDeg(i,d){this.setJointRad(i,d*Math.PI/180)} getJointDeg(){return this.angles.map(a=>a*180/Math.PI)}
+  setJointRad(i,a){this._applyAngle(i,a);this._changed()}setJointDeg(i,d){this.setJointRad(i,d*Math.PI/180)}getJointDeg(){return this.angles.map(a=>a*180/Math.PI)}
   setHome(){[0,20,-35,0,35,0].forEach((d,i)=>this._applyAngle(i,d*Math.PI/180));this._changed()}
   resetCamera(){this.camera.up.set(0,0,1);this.camera.position.set(3.7,-4.2,2.9);this.controls.target.set(.75,0,.85);this.controls.update()}
   getTCP(){if(!this.toolTip)return new THREE.Vector3();this.robotHolder.updateMatrixWorld(true);const p=new THREE.Vector3();this.toolTip.getWorldPosition(p);return p}
@@ -205,26 +65,9 @@ window.RobotLearnRobot = class RobotLearnRobot {
   _updateTCP(){if(!this.toolTip)return;const p=this.getTCP();this.tcpMarker.position.copy(p)}
   _changed(){this._alignTool();this._updateTCP();this._updateSensors();if(this.onChange)this.onChange(this)}
   _clampAngles(arr){return arr.map((a,i)=>Number.isFinite(a)?Math.max(this.config.limits[i][0],Math.min(this.config.limits[i][1],a)):NaN)}
-
-  solveIK(targetMM){
-    if(!targetMM||targetMM.length<3||!targetMM.slice(0,3).every(Number.isFinite))throw new Error('Target cartesiano inválido');
-    const target=new THREE.Vector3(targetMM[0]/1000,targetMM[1]/1000,targetMM[2]/1000),original=this.angles.slice();
-    for(let iter=0;iter<100;iter++){
-      const ee=this.getTCP();if(!Number.isFinite(ee.x+ee.y+ee.z))break;if(ee.distanceTo(target)<.003)break;
-      for(let i=4;i>=0;i--){this.robotHolder.updateMatrixWorld(true);const jp=new THREE.Vector3();this.jointGroups[i].getWorldPosition(jp);const q=new THREE.Quaternion();this.jointGroups[i].getWorldQuaternion(q);const axis=this.axisLocal[i].clone().applyQuaternion(q).normalize();let v1=this.getTCP().sub(jp),v2=target.clone().sub(jp);v1.sub(axis.clone().multiplyScalar(v1.dot(axis)));v2.sub(axis.clone().multiplyScalar(v2.dot(axis)));if(v1.lengthSq()<1e-8||v2.lengthSq()<1e-8)continue;v1.normalize();v2.normalize();const cross=new THREE.Vector3().crossVectors(v1,v2);let d=Math.atan2(axis.dot(cross),Math.max(-1,Math.min(1,v1.dot(v2))));if(!Number.isFinite(d))continue;d=Math.max(-.20,Math.min(.20,d));this._applyAngle(i,this.angles[i]+d)}
-    }
-    const result=this.angles.slice(),error=this.getTCP().distanceTo(target);original.forEach((a,i)=>this._applyAngle(i,a));if(!result.every(Number.isFinite)||!Number.isFinite(error))throw new Error('La IK produjo un resultado inválido; pose restaurada');if(error>.13)throw new Error(`Target fuera de alcance o singularidad (${Math.round(error*1000)} mm de error)`);return result;
-  }
-
-  animateJoints(targetAngles,speedFactor=1){
-    targetAngles=this._clampAngles(targetAngles);if(!targetAngles.every(Number.isFinite))return Promise.reject(new Error('Ángulos articulares inválidos'));
-    const start=this.angles.slice();let seconds=.12;for(let i=0;i<6;i++)seconds=Math.max(seconds,Math.abs(targetAngles[i]-start[i])/(this.config.maxSpeed[i]*Math.max(.1,speedFactor)));seconds=Math.min(3.4,Math.max(.12,seconds));
-    return new Promise(resolve=>{const t0=performance.now(),tick=now=>{const t=Math.min(1,(now-t0)/(seconds*1000)),e=t*t*(3-2*t);for(let i=0;i<6;i++)this._applyAngle(i,start[i]+(targetAngles[i]-start[i])*e);this._changed();if(t<1)requestAnimationFrame(tick);else resolve()};requestAnimationFrame(tick)})
-  }
-
-  jogLinearDelta(dx,dy,dz){
-    this.setToolDownLock(true);const p=this.getTCPmm(),target=[p.x+dx,p.y+dy,p.z+dz],angles=this.solveIK(target);angles.forEach((a,i)=>this._applyAngle(i,a));this._changed();return true;
-  }
+  solveIK(targetMM){if(!targetMM||targetMM.length<3||!targetMM.slice(0,3).every(Number.isFinite))throw new Error('Target cartesiano inválido');const target=new THREE.Vector3(targetMM[0]/1000,targetMM[1]/1000,targetMM[2]/1000),original=this.angles.slice();for(let iter=0;iter<100;iter++){const ee=this.getTCP();if(!Number.isFinite(ee.x+ee.y+ee.z))break;if(ee.distanceTo(target)<.003)break;for(let i=4;i>=0;i--){this.robotHolder.updateMatrixWorld(true);const jp=new THREE.Vector3();this.jointGroups[i].getWorldPosition(jp);const q=new THREE.Quaternion();this.jointGroups[i].getWorldQuaternion(q);const axis=this.axisLocal[i].clone().applyQuaternion(q).normalize();let v1=this.getTCP().sub(jp),v2=target.clone().sub(jp);v1.sub(axis.clone().multiplyScalar(v1.dot(axis)));v2.sub(axis.clone().multiplyScalar(v2.dot(axis)));if(v1.lengthSq()<1e-8||v2.lengthSq()<1e-8)continue;v1.normalize();v2.normalize();const cross=new THREE.Vector3().crossVectors(v1,v2);let d=Math.atan2(axis.dot(cross),Math.max(-1,Math.min(1,v1.dot(v2))));if(!Number.isFinite(d))continue;d=Math.max(-.20,Math.min(.20,d));this._applyAngle(i,this.angles[i]+d)}}const result=this.angles.slice(),error=this.getTCP().distanceTo(target);original.forEach((a,i)=>this._applyAngle(i,a));if(!result.every(Number.isFinite)||!Number.isFinite(error))throw new Error('La IK produjo un resultado inválido; pose restaurada');if(error>.13)throw new Error(`Target fuera de alcance o singularidad (${Math.round(error*1000)} mm de error)`);return result}
+  animateJoints(targetAngles,speedFactor=1){targetAngles=this._clampAngles(targetAngles);if(!targetAngles.every(Number.isFinite))return Promise.reject(new Error('Ángulos articulares inválidos'));const start=this.angles.slice();let seconds=.12;for(let i=0;i<6;i++)seconds=Math.max(seconds,Math.abs(targetAngles[i]-start[i])/(this.config.maxSpeed[i]*Math.max(.1,speedFactor)));seconds=Math.min(3.4,Math.max(.12,seconds));return new Promise(resolve=>{const t0=performance.now(),tick=now=>{const t=Math.min(1,(now-t0)/(seconds*1000)),e=t*t*(3-2*t);for(let i=0;i<6;i++)this._applyAngle(i,start[i]+(targetAngles[i]-start[i])*e);this._changed();if(t<1)requestAnimationFrame(tick);else resolve()};requestAnimationFrame(tick)})}
+  jogLinearDelta(dx,dy,dz){this.setToolDownLock(true);const p=this.getTCPmm(),target=[p.x+dx,p.y+dy,p.z+dz],angles=this.solveIK(target);angles.forEach((a,i)=>this._applyAngle(i,a));this._changed();return true}
   async moveJ(targetMM,speedFactor=1){this.setToolDownLock(true);return this.animateJoints(this.solveIK(targetMM),speedFactor)}
   async moveL(targetMM,speedFactor=1){this.setToolDownLock(true);const s=this.getTCPmm(),e={x:targetMM[0],y:targetMM[1],z:targetMM[2]},dist=Math.hypot(e.x-s.x,e.y-s.y,e.z-s.z),steps=Math.max(8,Math.min(42,Math.ceil(dist/50)));for(let k=1;k<=steps;k++){const t=k/steps,p=[s.x+(e.x-s.x)*t,s.y+(e.y-s.y)*t,s.z+(e.z-s.z)*t];await this.animateJoints(this.solveIK(p),Math.max(1.8,speedFactor*3))}}
   _animate(){requestAnimationFrame(()=>this._animate());this.controls.update();this._alignTool();this._updateTCP();this._updateSensors();this.renderer.render(this.scene,this.camera)}
