@@ -92,3 +92,14 @@ src/
 ## Filosofía
 
 Cada concepto del curso debería poder **leerlo, modificarlo, ejecutarlo y verlo** en la misma pantalla.
+
+
+## Modo offline
+
+RobotLearn puede ejecutarse sin conexión:
+
+1. En GitHub elegí **Code → Download ZIP**.
+2. Extraé el ZIP.
+3. Abrí `index.html` con Chrome o Edge.
+
+Three.js, OrbitControls y GLTFLoader están incluidos dentro de `vendor/`, por lo que no dependen de CDN. Los modelos `paquete.glb`, `lateral.glb` y `laterales.glb` también están embebidos en `src/offline-assets.js` para que funcionen incluso al abrir la web mediante `file://`. Si un navegador no pudiera decodificar esos assets, RobotLearn usa una celda procedural de emergencia en lugar de dejar el simulador vacío.
