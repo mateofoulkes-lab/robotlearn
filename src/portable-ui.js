@@ -7,12 +7,20 @@ if(P&&window.THREE){
   const b64=window.RobotLearnOfflineAssets&&window.RobotLearnOfflineAssets[key];
   if(location.protocol==='file:'&&b64&&THREE.GLTFLoader){
    return new Promise((resolve,reject)=>{
-    const loader=new THREE.GLTFLoader();
-    const dataUrl='data:model/gltf-binary;base64,'+String(b64).replace(/\\s+/g,'');
-    loader.load(dataUrl,g=>resolve(g.scene),undefined,err=>{
+    try{
+     const clean=String(b64).replace(/\s+/g,'');
+     const binary=atob(clean);
+     const bytes=new Uint8Array(binary.length);
+     for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+     const loader=new THREE.GLTFLoader();
+     loader.parse(bytes.buffer,'',g=>resolve(g.scene),err=>{
       console.error('RobotLearn offline GLB:',key,err);
-      reject(new Error('No pude decodificar '+key+' embebido'));
-    });
+      reject(new Error('No pude decodificar '+key+' embebido: '+(err?.message||err)));
+     });
+    }catch(err){
+     console.error('RobotLearn offline GLB:',key,err);
+     reject(new Error('No pude decodificar '+key+' embebido: '+(err?.message||err)));
+    }
    });
   }
   return baseGLB.call(this,url);
@@ -167,14 +175,14 @@ function initUI(){
 
  let down=false;const pad=q('#pad');
  const move=(x,y)=>{const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,rad=Math.min(r.width,r.height)*.34;let dx=(x-cx)/rad,dy=(y-cy)/rad,m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m;}q('#knob').style.left=`${50+dx*34}%`;q('#knob').style.top=`${50+dy*34}%`;
-  if(mode.value==='j123'){set(0,dx*100);set(1,-dy*100);}
-  else if(mode.value==='j456'){set(0,dx*100);set(1,-dy*100);}
-  else {set(0,dx*100);set(1,-dy*100);}};
+  if(mode.value==='j123'){set(0,dx*100);set(1,dy*100);}
+  else if(mode.value==='j456'){set(0,dx*100);set(1,dy*100);}
+  else {set(0,dx*100);set(1,dy*100);}};
  pad.onpointerdown=e=>{down=true;pad.setPointerCapture(e.pointerId);move(e.clientX,e.clientY)};
  pad.onpointermove=e=>down&&move(e.clientX,e.clientY);
  const release=()=>{down=false;center();set(0,0);set(1,0);};pad.onpointerup=release;pad.onpointercancel=release;
  const hold=(sel,val)=>{const el=q(sel),stop=()=>set(2,0);el.onpointerdown=e=>{el.setPointerCapture(e.pointerId);set(2,val)};el.onpointerup=stop;el.onpointercancel=stop;el.onpointerleave=stop;};
- hold('#bup',100);hold('#bdn',-100);
+ hold('#bup',-100);hold('#bdn',100);
  q('#tv').onclick=()=>vac.click();
 
  setInterval(()=>{
