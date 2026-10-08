@@ -55,22 +55,34 @@ if(P&&window.THREE){
   window.dispatchEvent(new CustomEvent('robotlearn-cell-ready-editor'));
  };
  P._loadWorkcell=async function(...a){
+  const haveEmbedded=!!(window.RobotLearnOfflineAssets&&window.RobotLearnOfflineAssets['paquete.glb']&&window.RobotLearnOfflineAssets['lateral.glb']&&window.RobotLearnOfflineAssets['laterales.glb']);
   try{
     const r=await baseLoad.apply(this,a);
-    setTimeout(()=>{if(!this.cell?.packageObj||!(this.cell.pieces||[]).length)this._buildPortableWorkcell();},600);
+    if(this.cell?.ready&&this.cell?.packageObj&&(this.cell.pieces||[]).length){
+      const box=document.querySelector('#threeError');
+      if(box)box.classList.add('hidden');
+      return r;
+    }
+    if(!haveEmbedded){
+      console.warn('No hay assets embebidos: uso fallback procedural.');
+      this._buildPortableWorkcell();
+    }else{
+      const msg='ERROR OFFLINE: los GLB reales no pudieron inicializarse.';
+      console.error(msg);
+      const box=document.querySelector('#threeError');
+      if(box){box.textContent=msg;box.classList.remove('hidden');}
+    }
     return r;
   }catch(e){
-   console.error('RobotLearn workcell real:',e);
-   const haveEmbedded=!!(window.RobotLearnOfflineAssets&&window.RobotLearnOfflineAssets['paquete.glb']&&window.RobotLearnOfflineAssets['lateral.glb']&&window.RobotLearnOfflineAssets['laterales.glb']);
-   if(!haveEmbedded){
-     console.warn('No hay assets embebidos: uso fallback procedural.');
-     this._buildPortableWorkcell();
-   }else{
-     this.cell.ready=false;
-     const msg='ERROR OFFLINE: no se pudieron cargar los GLB reales. Abrí la consola para ver el detalle.';
-     const box=document.querySelector('#threeError');
-     if(box){box.textContent=msg;box.classList.remove('hidden');}
-   }
+    console.error('RobotLearn workcell real:',e);
+    if(!haveEmbedded){
+      this._buildPortableWorkcell();
+    }else{
+      this.cell.ready=false;
+      const msg='ERROR OFFLINE: no se pudieron cargar los GLB reales.';
+      const box=document.querySelector('#threeError');
+      if(box){box.textContent=msg;box.classList.remove('hidden');}
+    }
   }
  };
  P.resetCell=function(...a){
