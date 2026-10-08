@@ -7,11 +7,12 @@ if(P&&window.THREE){
   const b64=window.RobotLearnOfflineAssets&&window.RobotLearnOfflineAssets[key];
   if(location.protocol==='file:'&&b64&&THREE.GLTFLoader){
    return new Promise((resolve,reject)=>{
-    try{
-     const bin=atob(b64), bytes=new Uint8Array(bin.length);
-     for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-     new THREE.GLTFLoader().parse(bytes.buffer,'',g=>resolve(g.scene),reject);
-    }catch(err){reject(err)}
+    const loader=new THREE.GLTFLoader();
+    const dataUrl='data:model/gltf-binary;base64,'+String(b64).replace(/\\s+/g,'');
+    loader.load(dataUrl,g=>resolve(g.scene),undefined,err=>{
+      console.error('RobotLearn offline GLB:',key,err);
+      reject(new Error('No pude decodificar '+key+' embebido'));
+    });
    });
   }
   return baseGLB.call(this,url);
@@ -58,7 +59,19 @@ if(P&&window.THREE){
     const r=await baseLoad.apply(this,a);
     setTimeout(()=>{if(!this.cell?.packageObj||!(this.cell.pieces||[]).length)this._buildPortableWorkcell();},600);
     return r;
-  }catch(e){console.warn('portable cell fallback',e); this._buildPortableWorkcell();}
+  }catch(e){
+   console.error('RobotLearn workcell real:',e);
+   const haveEmbedded=!!(window.RobotLearnOfflineAssets&&window.RobotLearnOfflineAssets['paquete.glb']&&window.RobotLearnOfflineAssets['lateral.glb']&&window.RobotLearnOfflineAssets['laterales.glb']);
+   if(!haveEmbedded){
+     console.warn('No hay assets embebidos: uso fallback procedural.');
+     this._buildPortableWorkcell();
+   }else{
+     this.cell.ready=false;
+     const msg='ERROR OFFLINE: no se pudieron cargar los GLB reales. Abrí la consola para ver el detalle.';
+     const box=document.querySelector('#threeError');
+     if(box){box.textContent=msg;box.classList.remove('hidden');}
+   }
+  }
  };
  P.resetCell=function(...a){
   if(!this.cell?.portable) return baseReset&&baseReset.apply(this,a);
@@ -118,7 +131,7 @@ function initUI(){
    <button data-m="linear">XYZ·IK</button>
   </div>
   <div class="jog">
-   <div id="pad" class="pad"><div id="knob" class="knob"></div></div>
+   <div id="pad" class="pad"><div id="knob" class="knob"></div><div style="position:absolute;left:12px;right:12px;bottom:9px;text-align:center;font:11px Consolas;color:#7893a4">← J1 / X → &nbsp;&nbsp; ↑ J2 / Y ↓</div></div>
    <div class="j3"><button id="bup">▲</button><button id="bdn">▼</button></div>
   </div>
  </div>
@@ -141,7 +154,10 @@ function initUI(){
  mode.addEventListener('change',sync);sync();
 
  let down=false;const pad=q('#pad');
- const move=(x,y)=>{const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,rad=Math.min(r.width,r.height)*.34;let dx=(x-cx)/rad,dy=(y-cy)/rad,m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m;}q('#knob').style.left=`${50+dx*34}%`;q('#knob').style.top=`${50+dy*34}%`;set(0,-dy*100);set(1,dx*100);};
+ const move=(x,y)=>{const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,rad=Math.min(r.width,r.height)*.34;let dx=(x-cx)/rad,dy=(y-cy)/rad,m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m;}q('#knob').style.left=`${50+dx*34}%`;q('#knob').style.top=`${50+dy*34}%`;
+  if(mode.value==='j123'){set(0,dx*100);set(1,-dy*100);}
+  else if(mode.value==='j456'){set(0,dx*100);set(1,-dy*100);}
+  else {set(0,dx*100);set(1,-dy*100);}};
  pad.onpointerdown=e=>{down=true;pad.setPointerCapture(e.pointerId);move(e.clientX,e.clientY)};
  pad.onpointermove=e=>down&&move(e.clientX,e.clientY);
  const release=()=>{down=false;center();set(0,0);set(1,0);};pad.onpointerup=release;pad.onpointercancel=release;
