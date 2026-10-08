@@ -1,6 +1,24 @@
 (()=>{
 const P=window.RobotLearnRobot&&window.RobotLearnRobot.prototype;
 if(P&&window.THREE){
+ const baseGLB=P._loadGLB;
+ P._loadGLB=function(url){
+  const key=String(url).split('?')[0].split('/').pop();
+  const b64=window.RobotLearnOfflineAssets&&window.RobotLearnOfflineAssets[key];
+  if(location.protocol==='file:'&&b64&&THREE.GLTFLoader){
+   return new Promise((resolve,reject)=>{
+    try{
+     const bin=atob(b64), bytes=new Uint8Array(bin.length);
+     for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+     new THREE.GLTFLoader().parse(bytes.buffer,'',g=>resolve(g.scene),reject);
+    }catch(err){reject(err)}
+   });
+  }
+  return baseGLB.call(this,url);
+ };
+}
+
+if(P&&window.THREE){
  const baseLoad=P._loadWorkcell, baseReset=P.resetCell;
  const M=(c,m=.1,r=.8)=>new THREE.MeshStandardMaterial({color:c,metalness:m,roughness:r});
  const mesh=(g,m,p)=>{const o=new THREE.Mesh(g,m);o.castShadow=o.receiveShadow=true;p.add(o);return o;};
@@ -36,7 +54,6 @@ if(P&&window.THREE){
   window.dispatchEvent(new CustomEvent('robotlearn-cell-ready-editor'));
  };
  P._loadWorkcell=async function(...a){
-  if(location.protocol==='file:'){this._buildPortableWorkcell(); return;}
   try{
     const r=await baseLoad.apply(this,a);
     setTimeout(()=>{if(!this.cell?.packageObj||!(this.cell.pieces||[]).length)this._buildPortableWorkcell();},600);
